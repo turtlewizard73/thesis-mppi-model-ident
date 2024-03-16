@@ -1,0 +1,4 @@
+[submodule "workspace/src/navigation2"]
+	path = workspace/src/navigation2
+	url = git@github.com:turtlewizard73/navigation2.git
+	branch = humble

@@ -1,0 +1,32 @@
+version: '2.4'
+
+services:
+  thesis_container_dev:
+    image: thesis_container_dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USERNAME: turtlewizard
+        ROS_DISTRO: humble
+    container_name: thesis_container_dev
+    network_mode: "host"
+    environment:
+      - DISPLAY
+      - MAKEFLAGS="-j6 -l6"
+      - ROS_DOMAIN_ID=9
+      # - MIXINS
+      # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
+    logging:
+      driver: "journald"
+    stdin_open: true
+    tty: true
+    stop_signal: SIGINT
+    privileged: true
+    volumes:
+      - /dev:/dev
+      - ./:/home/turtlewizard/thesis-mppi-model-ident
+      - ~/.gitconfig:/home/ubuntu/.gitconfig
+      - ~/.ssh:/home/ubuntu/.ssh
+    group_add:
+      - plugdev
