@@ -1,0 +1,5 @@
+workspace/build
+workspace/install
+workspace/log
+Dockerfile
+docker-compose.yml

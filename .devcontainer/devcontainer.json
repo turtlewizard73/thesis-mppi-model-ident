@@ -1,0 +1,70 @@
+{
+    "name": "thesis_container_dev",
+    "dockerComposeFile": ["../docker-compose.yml"],
+    "service": "thesis_container_dev",
+    "runServices": ["thesis_container_dev"],
+    "shutdownAction": "stopCompose",
+
+    "privileged": true,
+    "remoteUser": "turtlewizard",
+    "workspaceFolder": "/home/turtlewizard/thesis-mppi-model-ident",
+    // "workspaceMount": "source=${localWorkspaceFolder},target=/home/ws/src,type=bind",
+    "customizations": {
+        "vscode": {
+            "extensions":[
+            // docs.ros suggestions
+                // "ms-vscode.cpptools",
+                // "ms-vscode.cpptools-themes",
+                // "twxs.cmake",
+                // "donjayamanne.python-extension-pack",
+                "eamodio.gitlens",
+                // "ms-iot.vscode-ros"
+
+            // enjoy
+                "chiehyu.vscode-astyle",
+                "fredericbonnet.cmake-test-adapter",
+                "ms-python.python",
+                "ms-python.autopep8",
+                "ms-python.flake8",
+                "ms-iot.vscode-ros",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-extension-pack",
+                "redhat.vscode-yaml",
+                "streetsidesoftware.code-spell-checker",
+                "zachflower.uncrustify",
+                "twxs.cmake",
+                "github.copilot",
+                "esbenp.prettier-vscode",
+                "shardulm94.trailing-spaces",
+                "redhat.vscode-xml",
+
+            // turtle
+                "unthrottled.doki-theme",
+                "s-nlf-fh.glassit",
+                "wraith13.zoombar-vscode",
+                "JaehyunShim.vscode-ros2",
+                "yzhang.markdown-all-in-one",
+                "DavidAnson.vscode-markdownlint",
+                "bierner.markdown-mermaid",
+                "ms-toolsai.jupyter",
+                "Gruntfuggly.todo-tree",
+                "Anteger.vscode-touchgrass"
+            ]
+        }
+    },
+    // "containerEnv": {
+    //     "DISPLAY": "unix:0",
+    //     "ROS_LOCALHOST_ONLY": "1",
+    //     "ROS_DOMAIN_ID": "9"
+    // }
+    // "runArgs": [
+    //     "--net=host",
+    //     "-e", "DISPLAY=${env:DISPLAY}"
+    // ],
+    // "mounts": [
+    //     "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind,consistency=cached",
+    //     "source=/dev/dri,target=/dev/dri,type=bind,consistency=cached"
+    // ],
+    // "postCreateCommand": "sudo rosdep update && sudo rosdep install --from-paths src --ignore-src -y && sudo chown -R $(whoami) /home/ws/"
+}
