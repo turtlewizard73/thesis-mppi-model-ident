@@ -147,7 +147,12 @@
       "uid",
       "uids",
       "amcl",
-      "carto"
+      "carto",
+      "urdf",
+      "bringup",
+      "gzserver",
+      "gzclient",
+      "rviz"
     ],
     "cSpell.allowCompoundWords": true,
     "cSpell.ignorePaths": [

@@ -5,3 +5,5 @@ build
 install
 log
 nav2_humble_cache/*
+*.pickle
+*__pycache__*

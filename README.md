@@ -53,3 +53,15 @@ Intelisense for roc2 cpp (c_cpp_properties.json):
 Tasks:
 - https://github.com/athackst/vscode_ros2_workspace/blob/humble/.vscode/tasks.json
 - https://www.allisonthackston.com/articles/vscode-docker-ros2.html
+
+### Benchmarking
+REP 2014
+- it is mainly for latency cpu usage...
+- https://ros.org/reps/rep-2014.html (smart things for benchmarking - pkges...)
+- https://discourse.ros.org/t/rep-2014-rfc-benchmarking-performance-in-ros-2/27770
+- https://github.com/ros-infrastructure/rep/pull/364
+Performance test (communication - dds)
+- https://gitlab.com/ApexAI/performance_test/-/tree/master/performance_test?ref_type=heads
+
+### NAV2 benchmarking
+- peak Maci comments: https://discourse.ros.org/t/nav2-discussion-metrics-framework-for-quantitative-evaluation-of-navigation-performance/28082/
