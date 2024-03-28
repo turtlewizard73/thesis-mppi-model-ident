@@ -1,4 +1,7 @@
 workspace/build
 workspace/install
 workspace/log
+build
+install
+log
 nav2_humble_cache/*

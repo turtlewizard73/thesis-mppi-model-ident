@@ -1,6 +1,7 @@
-#!/bin/bash
-# Basic entrypoint for ROS containers
+#!/bin/sh
+set -e
 
+# Basic entrypoint for ROS containers
 # Source ROS 2
 source /opt/ros/${ROS_DISTRO}/setup.bash
 rosdep update

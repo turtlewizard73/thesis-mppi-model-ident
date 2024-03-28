@@ -112,6 +112,7 @@ RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /home/${USERNAME}/.bashrc
 RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/workspace/install/setup.bash" \
     >> /home/${USERNAME}/.bashrc
 RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> ~/.bashrc
+RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/aliases.sh" >> ~/.bashrc
 
 COPY ros_entrypoint.sh ros_entrypoint.sh
 ENTRYPOINT [ "/ros_entrypoint.sh" ]
