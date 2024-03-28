@@ -1,8 +1,6 @@
-version: '2.4'
-
 services:
   thesis_container_dev:
-    image: thesis_container_dev
+    image: ${DOCKER_REGISTRY}thesis_container_dev
     build:
       context: .
       dockerfile: Dockerfile
@@ -26,6 +24,7 @@ services:
     volumes:
       - /dev:/dev
       - ./:/home/turtlewizard/thesis-mppi-model-ident
+      - /tmp/.X11-unix:/tmp/.X11-unix
       - ~/.gitconfig:/home/ubuntu/.gitconfig
       - ~/.ssh:/home/ubuntu/.ssh
     group_add:

@@ -60,10 +60,41 @@ RUN \
 FROM underlay AS overlay
 WORKDIR /home/${USERNAME}/thesis-mppi-model-ident
 
+# Install dev apt packages - these pacakges are used for custom ros2 pkgs
+COPY dependencies-apt_dev.txt dependencies-apt_dev.txt
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+RUN \
+    --mount=type=cache,target=/var/cache/apt,mode=0777,sharing=locked \
+    --mount=type=cache,target=/root/.cache/pip,mode=0777,sharing=locked \
+    apt-get update && \
+    xargs -a dependencies-apt_dev.txt apt install -y --no-install-recommends
+
+# Install dev Python modules - these pacakges are used for custom ros2 pkgs
+COPY dependencies-pip_dev.txt dependencies-pip_dev.txt
+RUN \
+    --mount=type=cache,target=/root/.cache/pip,mode=0777,sharing=locked \
+    pip3 install -r dependencies-pip_dev.txt
+
+# # build the workspace
+# WORKDIR /home/${USERNAME}/thesis-mppi-model-ident/workspace
+# # Check if "nav2_humble_cache" folder contains "build" and "install" folders
+# RUN if [ -d "../nav2_humble_cache/build" ] && [ -d "../nav2_humble_cache/install" ]; then \
+#         echo "NAV2 already cached, copying and skipping build." && \
+#         cp -r ../nav2_humble_cache/build ./ && \
+#         cp -r ../nav2_humble_cache/install ./ ; \
+#     else \
+#         echo "nav2_humble_cache folder does not contain build and install folders, building..." && \
+#         source /opt/ros/$ROS_DISTRO/setup.bash && \
+#         colcon build --symlink-install && \
+#         cp -r ./build ../nav2_humble_cache/build && \
+#         cp -r ./install ../nav2_humble_cache/install ; \
+#     fi
+
+# Create new user and home directory
 ARG UID=1000
 ARG GID=${UID}
 
-# Create new user and home directory
 RUN \
     groupadd --gid $GID $USERNAME && \
     useradd --uid ${GID} --gid ${UID} --create-home ${USERNAME} && \
@@ -80,6 +111,7 @@ USER ${USERNAME}
 RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /home/${USERNAME}/.bashrc
 RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/workspace/install/setup.bash" \
     >> /home/${USERNAME}/.bashrc
+RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> ~/.bashrc
 
 COPY ros_entrypoint.sh ros_entrypoint.sh
 ENTRYPOINT [ "/ros_entrypoint.sh" ]
