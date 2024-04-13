@@ -113,6 +113,7 @@ RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/workspace/install/setup
     >> /home/${USERNAME}/.bashrc
 RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> ~/.bashrc
 RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/aliases.sh" >> ~/.bashrc
+RUN echo "export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models"
 
 COPY ros_entrypoint.sh ros_entrypoint.sh
 ENTRYPOINT [ "/ros_entrypoint.sh" ]

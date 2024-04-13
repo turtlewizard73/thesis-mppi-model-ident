@@ -18,12 +18,11 @@ def generate_launch_description():
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
 
     use_basic_config = True
-    use_gui = True
+    use_gui = False
 
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
     nav_config = os.path.join(this_package_dir, 'navigation.yaml') if \
-        use_basic_config is False else os.path.join(
-            this_package_dir, 'nav2_params.yaml')
+        use_basic_config is False else os.path.join(this_package_dir, 'nav2_params.yaml')
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
     world = ''  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
 
@@ -111,7 +110,7 @@ def generate_launch_description():
             cwd=[nav2_bringup_dir], output='screen'),
 
         ExecuteProcess(
-            condition=IfCondition(use_gui),
+            condition=IfCondition(str(use_gui)),
             cmd=['gzclient'],
             cwd=[nav2_bringup_dir], output='screen'),
 

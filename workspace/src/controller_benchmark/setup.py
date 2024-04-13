@@ -23,6 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'run_test = controller_benchmark.run_test:main'
         ],
     },
 )

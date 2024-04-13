@@ -169,9 +169,12 @@
     "git.detectSubmodulesLimit": 30,
 
     // ---------------- Python ----------------
+    "python.languageServer": "Default",
     "python.analysis.extraPaths": [
       "./**",
       "/usr/local/lib/python3.10/dist-packages",
+      "/opt/ros/humble/bin",
+      "/opt/ros/humble/lib",
       "/opt/ros/humble/lib/python3.10/site-packages",
       "/opt/ros/humble/local/lib/python3.10/site-packages"
     ],
@@ -179,6 +182,8 @@
     "python.autoComplete.extraPaths": [
       "./**",
       "/usr/local/lib/python3.10/dist-packages",
+      "/opt/ros/humble/bin",
+      "/opt/ros/humble/lib",
       "/opt/ros/humble/lib/python3.10/site-packages",
       "/opt/ros/humble/local/lib/python3.10/site-packages"
     ],

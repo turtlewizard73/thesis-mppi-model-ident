@@ -139,7 +139,6 @@ class OdomListener(Node):
 
 
 class GazeboInterface(Node):
-
     def __init__(self):
         super().__init__('gazebo_interface')
         self.reset_world_client = self.create_client(Empty, 'reset_world')
