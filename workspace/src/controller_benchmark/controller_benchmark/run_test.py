@@ -219,7 +219,7 @@ def main():
     # goals needs to be on free space
     # robot footprint around goal should be free
     # has to be at least min_distance away from starting point
-    number_of_goals = 2
+    number_of_goals = 10
     goals = []
     min_distance = 3.0  # [m]
     robot_length = 0.2  # along the x-axis of the robot [m]

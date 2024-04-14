@@ -65,3 +65,6 @@ Performance test (communication - dds)
 
 ### NAV2 benchmarking
 - peak Maci comments: https://discourse.ros.org/t/nav2-discussion-metrics-framework-for-quantitative-evaluation-of-navigation-performance/28082/
+
+### Plotting
+- matplotlib: https://realpython.com/python-matplotlib-guide/
