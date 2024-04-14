@@ -108,12 +108,16 @@ RUN chown -R ${UID}:${GID} /home/${USERNAME}/thesis-mppi-model-ident
 
 # Set the user and source entrypoint in the user's .bashrc file
 USER ${USERNAME}
-RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> /home/${USERNAME}/.bashrc
+RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" \
+    >> /home/${USERNAME}/.bashrc
 RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/workspace/install/setup.bash" \
     >> /home/${USERNAME}/.bashrc
-RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> ~/.bashrc
-RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/aliases.sh" >> ~/.bashrc
-RUN echo "export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models"
+RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" \
+    >> /home/${USERNAME}/.bashrc
+RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/aliases.sh" \
+    >> /home/${USERNAME}/.bashrc
+RUN echo "export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models" \
+    >> /home/${USERNAME}/.bashrc
 
 COPY ros_entrypoint.sh ros_entrypoint.sh
 ENTRYPOINT [ "/ros_entrypoint.sh" ]

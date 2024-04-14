@@ -17,7 +17,12 @@
 - rewrite metrics.py -> run_test.py
 - talked with Emil about metrics -> stamp msgs when arrived
 
+## 2024. 04. 14.
+- run_test.py and plot_results.py working
+
 ## TODOs - 2024. 04. 10.
+- make gazebo gui headless?
+- IMPORT WHYY NOT WORKING???
 - finish run_test.py
   - parametrize
   - think about number of retries

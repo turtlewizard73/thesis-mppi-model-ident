@@ -7,7 +7,7 @@ import numpy as np
 import time
 from random import randint, getrandbits, uniform
 from scipy.spatial.transform import Rotation
-from typing import List, Type
+from typing import List, Type, Dict
 from dataclasses import dataclass
 import pickle
 
@@ -19,7 +19,7 @@ from ament_index_python.packages import get_package_share_directory
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
 # Ros message types
-from geometry_msgs.msg import PoseStamped, TwistStamped
+from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Path, Odometry, OccupancyGrid
 from std_srvs.srv import Empty
@@ -42,9 +42,9 @@ class MarkerServer(Node):
     def __init__(self):
         super().__init__('marker_server')
         self.marker_publisher = self.create_publisher(
-            MarkerArray, 'goals_markers', 10)
+            MarkerArray, 'waypoints', 10)
         self.path_publisher = self.create_publisher(
-            Path, 'global_plans', 10)
+            Path, '/plan', 10)
 
     def publish_markers(self, poses: PoseStamped):
         """
@@ -92,16 +92,22 @@ class ListenerBase(Node):
             topic_name,
             self.callback,
             10)
+        self.get_logger().info(f'{node_name} initialized')
 
     def callback(self, msg):
+        # Rewrite stamp from msg generation time to capture time
+        if hasattr(msg, 'header'):
+            msg.header.stamp = self.get_clock().now().to_msg()
         self.msgs.append(msg)
 
     def get_msgs(self, start_time: Time, end_time: Time):
+        self.get_logger().info(f'Received msgs: {len(self.msgs)}')
+
         start = start_time.nanoseconds
         end = end_time.nanoseconds
         filtered_msgs = []
         for msg in self.msgs:
-            msg_time = msg.header.stamp.nanoseconds
+            msg_time = Time.from_msg(msg.header.stamp).nanoseconds
             if start <= msg_time <= end:
                 filtered_msgs.append(msg)
         error_msg = f'No msgs found within the time range: {start} - {end}'
@@ -109,6 +115,20 @@ class ListenerBase(Node):
 
         self.msgs = []
         return filtered_msgs
+
+
+class CmdVelListener(ListenerBase):
+    def __init__(self):
+        super().__init__(
+            node_name='cmd_vel_subscriber',
+            topic_name='/cmd_vel',
+            msg_type=Twist)
+
+    def callback(self, msg):
+        msg_stamped = TwistStamped()
+        msg_stamped.header.stamp = self.get_clock().now().to_msg()
+        msg_stamped.twist = msg
+        self.msgs.append(msg_stamped)
 
 
 class GazeboInterface(Node):
@@ -119,6 +139,7 @@ class GazeboInterface(Node):
             SetEntityState, 'set_entity_state')
         self.get_entity_client = self.create_client(
             GetEntityState, 'get_entity_state')
+        self.get_logger().info('Gazebo interface initialized')
 
     def reset_world(self):
         req = Empty.Request()
@@ -148,6 +169,7 @@ class GazeboInterface(Node):
 
 @dataclass
 class ControllerResult:
+    plan_idx: int
     plan: Path
     controller_name: str
     start_time: float  # nanoseconds
@@ -156,6 +178,13 @@ class ControllerResult:
     poses: List[PoseStamped]
     twists: List[TwistStamped]
     costmaps: List[OccupancyGrid]
+
+
+def spin_executor(executor):
+    try:
+        executor.spin()
+    except rclpy.executors.ExternalShutdownException:
+        pass
 
 
 def main():
@@ -190,7 +219,7 @@ def main():
     # goals needs to be on free space
     # robot footprint around goal should be free
     # has to be at least min_distance away from starting point
-    number_of_goals = 4
+    number_of_goals = 2
     goals = []
     min_distance = 3.0  # [m]
     robot_length = 0.2  # along the x-axis of the robot [m]
@@ -275,7 +304,7 @@ def main():
     # Generating global plans
     logger.info('Generating global plans...')
     planner = 'GridBased'
-    global_plans = []
+    global_plans: Dict[int, Path] = {}
     number_of_generation = 0
     while len(global_plans) < number_of_goals:
         number_of_generation += 1
@@ -288,7 +317,7 @@ def main():
         if global_plan is None:
             continue
 
-        global_plans.append(global_plan)
+        global_plans[len(global_plans)] = global_plan
 
     logger.info(f'Generated global plans, from {number_of_generation}')
 
@@ -300,12 +329,11 @@ def main():
     logger.info('Running controllers through plans...')
     controllers = ['DWB_benchmark', 'RPP_benchmark']
 
-    cmd_vel_sub_node = ListenerBase(
-        'cmd_vel_subscriber', 'cmd_vel', TwistStamped)
+    cmd_vel_sub_node = CmdVelListener()
     odom_sub_node = ListenerBase(
-        'odom_subscriber', 'odom', Odometry)
+        'odom_subscriber', '/odom', Odometry)
     costmap_sub_node = ListenerBase(
-        'costmap_subscriber', 'local_costmap', OccupancyGrid)
+        'costmap_subscriber', '/local_costmap/costmap', OccupancyGrid)
     gazebo_interface_node = GazeboInterface()
 
     sub_executor = rclpy.executors.MultiThreadedExecutor()
@@ -314,23 +342,27 @@ def main():
     sub_executor.add_node(costmap_sub_node)
     sub_executor.add_node(gazebo_interface_node)
     sub_executor_thread = Thread(
-        target=sub_executor.spin(), args=(sub_executor, ), daemon=True)
+        target=spin_executor, args=(sub_executor, ), daemon=True)
     sub_executor_thread.start()
-    time.sleep(2)  # wait for nodes to start
+    time.sleep(0.5)  # wait for nodes to start
 
     controller_results: List[ControllerResult] = []
-    for i, plan in enumerate(global_plans):
+    for i, plan in global_plans.items():
         # TODO: publish plan to rviz
+        marker_server_node.publish_path(plan)
+        logger.info(f'Starting plan: {i}')
         for controller in controllers:
             gazebo_interface_node.reset_world()
+            time.sleep(0.5)
 
+            nav.clearLocalCostmap()
             start_time = rclpy.clock.Clock().now()
-            nav.followPath(plan, controller)
+            nav.followPath(plan, controller_id=controller)
             logger.info(
                 f'Starting controller: {controller}, '
                 f'started at time: {start_time.seconds_nanoseconds}')
             while not nav.isTaskComplete():
-                time_ = rclpy.clock.Clock().now().seconds_nanoseconds
+                time_ = rclpy.clock.Clock().now().seconds_nanoseconds()
                 logger.info(f'Measuring at: {time_}')
                 time.sleep(0.1)
             end_time = rclpy.clock.Clock().now()
@@ -350,6 +382,7 @@ def main():
                 f'at: {end_time.seconds_nanoseconds},')
 
             controller_results.append(ControllerResult(
+                plan_idx=i,
                 plan=plan,
                 controller_name=controller,
                 start_time=start_time.nanoseconds,
@@ -363,9 +396,11 @@ def main():
             gazebo_interface_node.reset_world()
 
     logger.info('Controllers finished')
-    print("Write Results...")
-    stamp = time.strftime("%Y-%m-%d-%H-%M")
-    filename = f'/controller_benchmark_results_{stamp}.pickle'
+
+    logger.info("Write Results...")
+    # stamp = time.strftime("%Y-%m-%d-%H-%M")
+    # filename = f'/controller_benchmark_results_{stamp}.pickle'
+    filename = '/controller_benchmark_results.pickle'
     with open(os.getcwd() + filename, 'wb+') as f:
         pickle.dump(controller_results, f, pickle.HIGHEST_PROTOCOL)
 

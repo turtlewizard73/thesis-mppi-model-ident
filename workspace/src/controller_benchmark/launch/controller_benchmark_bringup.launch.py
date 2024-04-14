@@ -18,7 +18,7 @@ def generate_launch_description():
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
 
     use_basic_config = True
-    use_gui = False
+    use_gui = True
 
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
     nav_config = os.path.join(this_package_dir, 'navigation.yaml') if \
