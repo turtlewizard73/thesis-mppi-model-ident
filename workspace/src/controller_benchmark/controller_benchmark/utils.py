@@ -6,6 +6,7 @@ from typing import List
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from nav_msgs.msg import Path, OccupancyGrid
 
+
 @dataclass
 class ControllerResult:
     plan_idx: int

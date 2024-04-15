@@ -8,7 +8,6 @@ import time
 from random import randint, getrandbits, uniform
 from scipy.spatial.transform import Rotation
 from typing import List, Type, Dict
-from dataclasses import dataclass
 import pickle
 
 # Ros related modules
@@ -24,6 +23,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Path, Odometry, OccupancyGrid
 from std_srvs.srv import Empty
 from gazebo_msgs.srv import SetEntityState, GetEntityState
+
+from controller_benchmark.utils import ControllerResult
 
 
 this_package_dir = get_package_share_directory('controller_benchmark')
@@ -162,22 +163,9 @@ class GazeboInterface(Node):
             self.get_logger().info(
                 f'service {client.srv_name} not available, waiting again...')
 
-        self.future = client.call_async(req)
-        rclpy.spin_until_future_complete(self, self.future)
-        return self.future.result()
-
-
-@dataclass
-class ControllerResult:
-    plan_idx: int
-    plan: Path
-    controller_name: str
-    start_time: float  # nanoseconds
-    end_time: float  # nanoseconds
-    result: bool
-    poses: List[PoseStamped]
-    twists: List[TwistStamped]
-    costmaps: List[OccupancyGrid]
+        future = client.call_async(req)
+        rclpy.spin_until_future_complete(self, future)
+        return future.result()
 
 
 def spin_executor(executor):
@@ -211,7 +199,8 @@ def main():
     global_costmap.resize(
         global_costmap_msg.metadata.size_y, global_costmap_msg.metadata.size_x)
     resolution = global_costmap_msg.metadata.resolution
-    logger.info(f'Global costmap size: {global_costmap.shape}, resolution: {resolution}')
+    logger.info(
+        f'Global costmap size: {global_costmap.shape}, resolution: {resolution}')
 
     # Generate random goals
     logger.info('Generating goals...')
@@ -219,7 +208,7 @@ def main():
     # goals needs to be on free space
     # robot footprint around goal should be free
     # has to be at least min_distance away from starting point
-    number_of_goals = 10
+    number_of_goals = 2
     goals = []
     min_distance = 3.0  # [m]
     robot_length = 0.2  # along the x-axis of the robot [m]
@@ -231,7 +220,7 @@ def main():
     start.pose.position.x = 0.0
     start.pose.position.y = 0.0
     q = Rotation.from_euler(
-            'zyx', [0., 0., 0.], degrees=False).as_quat()
+        'zyx', [0., 0., 0.], degrees=False).as_quat()
     start.pose.orientation.w = q[0]
     start.pose.orientation.x = q[1]
     start.pose.orientation.y = q[2]
@@ -270,7 +259,8 @@ def main():
             continue
 
         # check if footprint is free
-        roi = global_costmap[goal_y-y_buffer:goal_y+y_buffer, goal_x-x_buffer:goal_x+x_buffer]
+        roi = global_costmap[goal_y - y_buffer:goal_y +
+                             y_buffer, goal_x - x_buffer:goal_x + x_buffer]
         if np.average(roi) != 0:
             continue
 
@@ -348,7 +338,6 @@ def main():
 
     controller_results: List[ControllerResult] = []
     for i, plan in global_plans.items():
-        # TODO: publish plan to rviz
         marker_server_node.publish_path(plan)
         logger.info(f'Starting plan: {i}')
         for controller in controllers:
@@ -363,7 +352,7 @@ def main():
                 f'started at time: {start_time.seconds_nanoseconds}')
             while not nav.isTaskComplete():
                 time_ = rclpy.clock.Clock().now().seconds_nanoseconds()
-                logger.info(f'Measuring at: {time_}')
+                # logger.info(f'Measuring at: {time_}')
                 time.sleep(0.1)
             end_time = rclpy.clock.Clock().now()
 

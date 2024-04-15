@@ -9,26 +9,8 @@ import matplotlib.pyplot as plt
 # Ros related modules
 from rclpy import logging
 from rclpy.time import Time
-# from controller_benchmark.utils import ControllerResult
 
-
-from dataclasses import dataclass
-from typing import List
-
-from geometry_msgs.msg import PoseStamped, TwistStamped
-from nav_msgs.msg import Path, OccupancyGrid
-
-@dataclass
-class ControllerResult:
-    plan_idx: int
-    plan: Path
-    controller_name: str
-    start_time: float  # nanoseconds
-    end_time: float  # nanoseconds
-    result: bool
-    poses: List[PoseStamped]
-    twists: List[TwistStamped]
-    costmaps: List[OccupancyGrid]
+from controller_benchmark.utils import ControllerResult
 
 
 logger = logging.get_logger('controller_benchmark')
@@ -49,7 +31,7 @@ def plot_figures(figures, nrows=1, ncols=1):
         axeslist.ravel()[idx].imshow(figures[title], cmap=plt.gray())
         axeslist.ravel()[idx].set_title(title)
         axeslist.ravel()[idx].set_axis_off()
-    plt.tight_layout() # optional
+    plt.tight_layout()  # optional
 
 
 def main():
@@ -78,12 +60,25 @@ def main():
         fig.suptitle(f'Plan {plan_idx}')
 
         # fig = plt.subplots(nrows=1, ncols=2)
-        ax_vel_x = fig.add_subplot(121)
-        ax_vel_theta = fig.add_subplot(122)
+        ax_plan = fig.add_subplot(131)
+        ax_vel_x = fig.add_subplot(132)
+        ax_vel_theta = fig.add_subplot(133)
+
+        ax_plan.set_title('Global plan')
+        ax_plan.set_xlabel('X [m]')
+        ax_plan.set_ylabel('Y [m]')
+
+        x_plan, y_plan = [], []
+        for pose_stamped in controller_results[0].plan.poses:
+            x_plan.append(pose_stamped.pose.position.x)
+            y_plan.append(pose_stamped.pose.position.y)
+        ax_plan.plot(x_plan, y_plan, label='generated_plan')
+        # ax_vel_x.legend()
 
         ax_vel_x.set_title('Linear velocities')
         ax_vel_x.set_xlabel('Time [s]')
         ax_vel_x.set_ylabel('Velocity [m/s]')
+
         ax_vel_theta.set_title('Angular velocities')
         ax_vel_theta.set_xlabel('Time [s]')
         ax_vel_theta.set_ylabel('Velocity [rad/s]')
@@ -92,8 +87,17 @@ def main():
         # - velocity x theta vs time vs controller
         for idx, result in enumerate(controller_results):
             time = []
+            x, y = [], []
             vel_x = []
             vel_theta = []
+
+            for pose_stamped_cov in result.poses:
+                x.append(pose_stamped_cov.pose.pose.position.x)
+                y.append(pose_stamped_cov.pose.pose.position.y)
+
+            ax_plan.plot(x, y, label=result.controller_name)
+            ax_plan.legend()
+
             for twiststamped in result.twists:
                 t_ = Time.from_msg(twiststamped.header.stamp)
 
@@ -105,11 +109,13 @@ def main():
 
             ax_vel_x.plot(time, vel_x, label=result.controller_name)
             ax_vel_x.legend()
+
             ax_vel_theta.plot(time, vel_theta, label=result.controller_name)
             ax_vel_theta.legend()
+
             plan_figures.append(fig)
 
-        fig.tight_layout()
+        # fig.tight_layout()
 
     plt.show()
 
