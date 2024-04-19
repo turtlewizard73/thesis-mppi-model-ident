@@ -1,4 +1,3 @@
-# syntax = docker/dockerfile:1.3
 # https://roboticseabass.com/2023/07/09/updated-guide-docker-and-ros2/
 # ROS distribution to use
 ARG ROS_DISTRO=humble
@@ -11,7 +10,7 @@ ENV ROS_DISTRO=${ROS_DISTRO}
 ARG USERNAME=USERNAME
 SHELL ["/bin/bash", "-c"]
 
-RUN mkdir -p /home/${USERNAME}
+RUN mkdir -p /home/${USERNAME}/thesis-mppi-model-ident
 WORKDIR /home/${USERNAME}/thesis-mppi-model-ident
 
 # Install basic apt packages

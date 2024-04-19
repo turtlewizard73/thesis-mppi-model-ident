@@ -68,3 +68,9 @@ Performance test (communication - dds)
 
 ### Plotting
 - matplotlib: https://realpython.com/python-matplotlib-guide/
+
+### Raspberry install
+- imager: https://www.raspberrypi.com/software/
+- install ros2: https://docs.ros.org/en/humble/How-To-Guides/Installing-on-Raspberry-Pi.html
+- multi platform build:https://stackoverflow.com/questions/59756123/use-buildx-build-linux-arm64-in-docker-compose-file
+- https://docs.docker.com/compose/compose-file/05-services/#platform

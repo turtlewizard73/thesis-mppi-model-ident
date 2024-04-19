@@ -1,6 +1,7 @@
 services:
   thesis_container_dev:
     image: ${DOCKER_REGISTRY}thesis_container_dev
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -29,3 +30,36 @@ services:
       - ~/.ssh:/home/ubuntu/.ssh
     group_add:
       - plugdev
+
+  thesis_container_berry:
+    image: ${DOCKER_REGISTRY}thesis_container_berry
+    platform: linux/arm64/v8
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USERNAME: turtlewizard
+        ROS_DISTRO: humble
+    container_name: thesis_container_berry
+    network_mode: "host"
+    environment:
+      - DISPLAY
+      - MAKEFLAGS="-j6 -l6"
+      - ROS_DOMAIN_ID=9
+      # - MIXINS
+      # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
+    logging:
+      driver: "journald"
+    stdin_open: true
+    tty: true
+    stop_signal: SIGINT
+    privileged: true
+    volumes:
+      - /dev:/dev
+      - ./:/home/turtlewizard/thesis-mppi-model-ident
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ~/.gitconfig:/home/ubuntu/.gitconfig
+      - ~/.ssh:/home/ubuntu/.ssh
+    group_add:
+      - plugdev
+
