@@ -7,6 +7,7 @@ ARG ROS_DISTRO=humble
 #######################################
 FROM ros:${ROS_DISTRO} as base
 ENV ROS_DISTRO=${ROS_DISTRO}
+ARG DEBIAN_FRONTEND=noninteractive
 ARG USERNAME=USERNAME
 SHELL ["/bin/bash", "-c"]
 

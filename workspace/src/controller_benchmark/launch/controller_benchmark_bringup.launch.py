@@ -17,11 +17,11 @@ def generate_launch_description():
     this_package_dir = get_package_share_directory('controller_benchmark')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
 
-    use_basic_config = True
-    use_gui = False
+    use_basic_config = False
+    use_gui = True
 
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
-    nav_config = os.path.join(this_package_dir, 'navigation.yaml') if \
+    nav_config = os.path.join(this_package_dir, 'nav2_params_mppi.yaml') if \
         use_basic_config is False else os.path.join(this_package_dir, 'nav2_params.yaml')
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
     world = ''  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
@@ -29,6 +29,8 @@ def generate_launch_description():
     urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
     with open(urdf, 'r') as urdf_file:
         robot_description = urdf_file.read()
+
+    gazebo_dir = get_package_share_directory('gazebo_ros')
 
     # -------------------------------------------------------------------------------------
     # Nodes, processes:                         -> task                 - config file
@@ -57,7 +59,7 @@ def generate_launch_description():
             name='map_odom_broadcaster',
             output='screen',
             parameters=[{'use_sim_time': True}],
-            arguments=["0", "0", "0", "0", "0", "0", "odom", "map"]),
+            arguments=["0", "0", "0", "0", "0", "0", "map", "odom"]),
 
         Node(
             package='nav2_map_server',
@@ -103,16 +105,28 @@ def generate_launch_description():
                               'use_namespace': 'False'}.items()),
 
         # Gazebo simulation
-        ExecuteProcess(
-            cmd=['gzserver', '-s', 'libgazebo_ros_init.so',
-                 '-s', 'libgazebo_ros_factory.so',
-                 '-s', 'libgazebo_ros_state.so', world],
-            cwd=[nav2_bringup_dir], output='screen'),
+        # ExecuteProcess(
+        #     cmd=['gzserver', '-s', 'libgazebo_ros_init.so',
+        #          '-s', 'libgazebo_ros_factory.so',
+        #          '-s', 'libgazebo_ros_state.so', world],
+        #     cwd=[nav2_bringup_dir], output='screen'),
 
-        ExecuteProcess(
-            condition=IfCondition(str(use_gui)),
-            cmd=['gzclient'],
-            cwd=[nav2_bringup_dir], output='screen'),
+        # ExecuteProcess(
+        #     condition=IfCondition(str(use_gui)),
+        #     cmd=['gzclient'],
+        #     cwd=[nav2_bringup_dir], output='screen'),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(gazebo_dir, 'launch', 'gzserver.launch.py')),
+            launch_arguments={'world': world,
+                              'pause': 'false',
+                              'verbose': 'true'}.items()),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(gazebo_dir, 'launch', 'gzclient.launch.py')),
+            condition=IfCondition(str(use_gui))),
 
         Node(
             package='robot_state_publisher',

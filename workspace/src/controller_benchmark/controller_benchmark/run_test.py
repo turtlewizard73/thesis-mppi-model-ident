@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 
 # Common modules
 import os
@@ -317,7 +317,7 @@ def main():
     # - cmd_vel
     # - costmap
     logger.info('Running controllers through plans...')
-    controllers = ['DWB_benchmark', 'RPP_benchmark']
+    controllers = ['MPPI_example', 'MPPI_Maneuver']
 
     cmd_vel_sub_node = CmdVelListener()
     odom_sub_node = ListenerBase(
@@ -376,7 +376,7 @@ def main():
                 controller_name=controller,
                 start_time=start_time.nanoseconds,
                 end_time=end_time.nanoseconds,
-                result=nav.getResult(),
+                result=nav_result,
                 poses=odom_sub_node.get_msgs(start_time, end_time),
                 twists=cmd_vel_sub_node.get_msgs(start_time, end_time),
                 costmaps=costmap_sub_node.get_msgs(start_time, end_time)

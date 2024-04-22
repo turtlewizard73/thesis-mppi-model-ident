@@ -7,6 +7,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import linalg
+from tabulate import tabulate
 
 # Ros related modules
 from rclpy import logging
@@ -77,6 +78,7 @@ def main():
         dt_twist = [Time.from_msg(i.header.stamp).nanoseconds *
                     1e-9 for i in result.twists]
         dt_twist = [t - dt_twist[0] for t in dt_twist]
+        # logger.info(f"{dt_twist}")
 
         # getting velocitties
         vel_linear = [ts.twist.linear.x for ts in result.twists]
@@ -86,18 +88,20 @@ def main():
         t_end = Time.from_msg(result.twists[-1].header.stamp).nanoseconds
         t_start = Time.from_msg(result.twists[0].header.stamp).nanoseconds
         dt = (t_end - t_start) / len(result.twists)
+        logger.info(f"{dt}")
 
         # calculating mean squared jerk of velocities
-        acc_linear = np.gradient(vel_linear, dt)
-        jerk_linear = np.gradient(acc_linear, dt)
+        acc_linear = np.gradient(vel_linear, dt_twist)
+        jerk_linear = np.gradient(acc_linear, dt_twist)
 
-        acc_angular = np.gradient(vel_angular, dt)
-        jerk_angular = np.gradient(acc_angular, dt)
+        acc_angular = np.gradient(vel_angular, dt_twist)
+        jerk_angular = np.gradient(acc_angular, dt_twist)
 
         controller_metric = ControllerMetric(
             plan_idx=result.plan_idx,
             plan_length=generated_plan_length,
             plan=result.plan,
+            result=result.result,
             controller_name=result.controller_name,
             length=traveled_plan_length,
             diff_from_plan=traveled_plan_length - generated_plan_length,
@@ -143,9 +147,12 @@ def main():
         fig.suptitle(f'Plan {plan_idx}')
 
         # fig = plt.subplots(nrows=1, ncols=2)
-        ax_plan = fig.add_subplot(131)
-        ax_vel_x = fig.add_subplot(132)
-        ax_vel_theta = fig.add_subplot(133)
+        ax_plan = fig.add_subplot(231)
+        ax_vel_x = fig.add_subplot(232)
+        ax_vel_theta = fig.add_subplot(233)
+        ax_acc_x = fig.add_subplot(234)
+        ax_acc_theta = fig.add_subplot(235)
+        ax_jerk_x = fig.add_subplot(236)
 
         ax_plan.set_title('Global plan')
         ax_plan.set_xlabel('X [m]')
@@ -167,6 +174,18 @@ def main():
         ax_vel_theta.set_xlabel('Time [s]')
         ax_vel_theta.set_ylabel('Velocity [rad/s]')
 
+        ax_acc_x.set_title('Linear acceleration')
+        ax_acc_x.set_xlabel('Time [s]')
+        ax_acc_x.set_ylabel('Acceleration [m/s^2]')
+
+        ax_acc_theta.set_title('Angular acceleration')
+        ax_acc_theta.set_xlabel('Time [s]')
+        ax_acc_theta.set_ylabel('Acceleration [m/s^2]')
+
+        ax_jerk_x.set_title('Linear RMS jerk')
+        ax_jerk_x.set_xlabel('Time [s]')
+        ax_jerk_x.set_ylabel('RMS jerk [m/s^3]')
+
         # plot measured data for each plan:
         # - velocity x theta vs time vs controller
         for metric in single_plan_metrics:
@@ -181,9 +200,59 @@ def main():
                 metric.dt_twist, metric.ang_vel, label=metric.controller_name)
             ax_vel_theta.legend()
 
+            ax_acc_x.plot(
+                metric.dt_twist, metric.lin_acc, label=metric.controller_name)
+            ax_acc_x.legend()
+
+            ax_acc_theta.plot(
+                metric.dt_twist, metric.ang_acc, label=metric.controller_name)
+            ax_acc_theta.legend()
+
+            ax_jerk_x.plot(
+                metric.dt_twist, metric.lin_jerk, label=metric.controller_name)
+
             plan_figures.append(fig)
 
         # fig.tight_layout()
+
+    # separating metrics by controller
+    single_controller_metrics: Dict[str, List] = {}
+    for metric in controller_metrics:
+        if metric.controller_name not in single_controller_metrics:
+            single_controller_metrics[metric.controller_name] = []
+        single_controller_metrics[metric.controller_name].append(metric)
+
+    table = [[
+        'Controller', 'Succes rate',
+        'Avarage lin speed [m/s]', 'Avarage ang speed [m/s]',
+        'Avarage lin acc [m/s^2]', 'Avarage ang acc [rad/s^2]',
+        'Avarage lin jerk rms [m/s^3]', 'Avarage ang jerk rms [rad/s^3]',
+    ]]
+    for controller, controller_metrics in single_controller_metrics.items():
+        success_rate = sum(
+            [1 for m in controller_metrics if m.result is True]) / len(controller_metrics)
+        avg_lin_vel = sum(
+            [m.lin_vel_avg for m in controller_metrics]) / len(controller_metrics)
+        avg_ang_vel = sum(
+            [m.ang_vel_avg for m in controller_metrics]) / len(controller_metrics)
+        avg_lin_acc = sum(
+            [m.lin_acc_avg for m in controller_metrics]) / len(controller_metrics)
+        avg_ang_acc = sum(
+            [m.ang_acc_avg for m in controller_metrics]) / len(controller_metrics)
+        logger.info(f"{[m.lin_acc_avg for m in controller_metrics]}")
+        avg_lin_jerk = sum(
+            [m.lin_jerk_rms for m in controller_metrics]) / len(controller_metrics)
+        avg_ang_jerk = sum(
+            [m.ang_jerk_rms for m in controller_metrics]) / len(controller_metrics)
+
+        table.append([
+            controller, success_rate,
+            avg_lin_vel, avg_ang_vel,
+            avg_lin_acc, avg_ang_acc,
+            avg_lin_jerk, avg_ang_jerk])
+
+    logger.info('\n' + tabulate(
+        np.array(table).T.tolist(), headers="firstrow", showindex="always", floatfmt=".5f", tablefmt="github"))
 
     plt.show()
 

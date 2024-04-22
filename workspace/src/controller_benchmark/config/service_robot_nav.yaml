@@ -29,6 +29,7 @@ navigation_executor:
       - nav2_goal_checker_selector_bt_node
       - nav2_truncate_path_action_bt_node
       - send_string_bt_node
+      - play_sound_bt_node
       - send_float_bt_node
       - assert_localization_ok_bt_node
       - cmd_vel_relay_bt_node
@@ -37,6 +38,12 @@ navigation_executor:
       - get_table_pose_bt_node
       - sequence_with_blackboard_memory_node
       - nav2_goal_reached_condition_bt_node
+      - bool_condition_bt_node
+      - is_on_path_bt_node
+      - if_then_else_reactive_bt_node
+      - in_collision_bt_node
+      - is_near_bt_node
+      - prune_path_bt_node
     error_code_names:
       - compute_path_error_code
       - follow_path_error_code
@@ -59,7 +66,7 @@ controller_server:
       - "patrolling_goal_checker"
       - "precise_goal_checker"
       - "approach_goal_checker"
-    controller_plugins: ["Approach", "FollowPath"]
+    controller_plugins: ["Approach", "Cruise", "Maneuver"]
 
     # Progress checker parameters
     progress_checker:
@@ -86,7 +93,7 @@ controller_server:
       xy_goal_tolerance: 0.41
       yaw_goal_tolerance: 0.30  # ~ 18 deg
 
-    FollowPath:
+    Maneuver:
       plugin: "nav2_mppi_controller::MPPIController"
       time_steps: 60
       model_dt: 0.05
@@ -94,10 +101,10 @@ controller_server:
       vx_std: 0.2
       vy_std: 0.2
       wz_std: 0.4
-      vx_max: 1.5
+      vx_max: 0.254
       vx_min: -0.15
       vy_max: 0.5
-      wz_max: 1.9
+      wz_max: 0.322
       iteration_count: 1
       prune_distance: 1.7
       transform_tolerance: 0.1
@@ -112,7 +119,7 @@ controller_server:
         time_step: 3
       AckermannConstraints:
         min_turning_r: 0.1
-      critics: ["ConstraintCritic", "ObstaclesCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
+      critics: ["ConstraintCritic", "CostCritic", "GoalCritic", "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic", "PathAngleCritic", "PreferForwardCritic"]
       ConstraintCritic:
         enabled: true
         cost_power: 1
@@ -132,17 +139,15 @@ controller_server:
         cost_power: 2
         cost_weight: 15.0
         threshold_to_consider: 0.5
-      ObstaclesCritic:
+      CostCritic:
         enabled: true
         cost_power: 1
-        repulsion_weight: 1.5
-        critical_weight: 20.0
-        consider_footprint: false
-        collision_cost: 10000.0
-        collision_margin_distance: 0.1
-        near_goal_distance: 0.5
-        inflation_radius: 1.0 # (only in Humble)
-        cost_scaling_factor: 3.0 # (only in Humble)
+        cost_weight: 3.81
+        critical_cost: 100.0
+        consider_footprint: true
+        collision_cost: 1000000.0
+        near_goal_distance: 1.0
+        trajectory_point_step: 2
       PathAlignCritic:
         enabled: true
         cost_power: 1
@@ -166,6 +171,46 @@ controller_server:
         threshold_to_consider: 0.5
         max_angle_to_furthest: 1.0
         mode: 0
+
+    Cruise:
+      plugin: "dwb_core::DWBLocalPlanner"
+      debug_trajectory_details: True
+      min_vel_x: 0.0
+      min_vel_y: 0.0
+      max_vel_x: 0.8
+      max_vel_y: 0.0
+      max_vel_theta: 1.2
+      min_speed_xy: 0.0
+      max_speed_xy: 0.8
+      min_speed_theta: 0.0
+      acc_lim_x: 0.75
+      acc_lim_y: 0.0
+      acc_lim_theta: 0.75
+      decel_lim_x: -2.0
+      decel_lim_y: 0.0
+      decel_lim_theta: -0.75
+      vx_samples: 20
+      vy_samples: 0
+      vtheta_samples: 20
+      sim_time: 1.7
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      xy_goal_tolerance: 0.05
+      trans_stopped_velocity: 0.05
+      short_circuit_trajectory_evaluation: True
+      stateful: True
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 0.02
+      PathAlign.scale: 32.0
+      GoalAlign.scale: 24.0
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 32.0
+      GoalDist.scale: 24.0
+      RotateToGoal.scale: 32.0
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: -1.0
 
     Approach:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
@@ -207,10 +252,23 @@ local_costmap:
       width: 3
       height: 3
       resolution: 0.02
+      filters: ["speed_filter", "select_controller_binary_filter"]
       plugins: ["static_layer", "temporal_voxel_layer", "lidar_obstacle_layer", "inflation_layer"]
+      speed_filter:
+        plugin: "nav2_costmap_2d::SpeedFilter"
+        enabled: True
+        filter_info_topic: "/nav/speed_mask_filter_info"
+        speed_limit_topic: "/nav/speed_limit"
+      select_controller_binary_filter:
+        plugin: "nav2_costmap_2d::BinaryFilter"
+        enabled: True
+        filter_info_topic: "/nav/controller_mask_filter_info"
+        default_state: False
+        binary_state_topic: "/nav/select_high_speed_controller"
+        flip_threshold: 0.3  # m/s
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: false
+        map_subscribe_transient_local: true
         subscribe_to_updates: true
         transform_tolerance: 1.0
         map_topic: /nav/lidar_with_keepout_map
@@ -309,48 +367,24 @@ global_costmap:
       rolling_window: false
       width: 30  # default, overwritten by lidarmap from map_manager
       height: 30  # default, overwritten by lidarmap from map_manager
-      map_subscribe_transient_local: false
       update_frequency: 5.0
       publish_frequency: 5.0
       global_frame: map
       robot_base_frame: base_link
       resolution: 0.05
       track_unknown_space: true
-      filters: ["speed_filter", "keepout_filter"]
-      speed_filter:
-        plugin: "nav2_costmap_2d::SpeedFilter"
-        enabled: True
-        filter_info_topic: "/nav/speed_mask_filter_info"
-        speed_limit_topic: "/nav/speed_limit"
+      filters: ["keepout_filter"]
       keepout_filter:
         plugin: "nav2_costmap_2d::KeepoutFilter"
         enabled: True
         filter_info_topic: "/nav/preferred_path_filter_info"
-      plugins: ["static_layer", "lidar_obstacle_layer", "inflation_layer"]
+      plugins: ["static_layer", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: false
+        map_subscribe_transient_local: true
         subscribe_to_updates: true
         transform_tolerance: 1.0
         map_topic: /nav/lidar_with_keepout_map
-      lidar_obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: true
-        footprint_clearing_enabled: true
-        combination_method: 2 # MaxWithoutUnknownOverwrite
-        observation_sources: front_lidar rear_lidar
-        front_lidar:
-          data_type: LaserScan
-          topic: /front_lidar/scan
-          marking: true
-          clearing: true
-          inf_is_valid: true
-        rear_lidar:
-          data_type: LaserScan
-          topic: /rear_lidar/scan
-          marking: true
-          clearing: true
-          inf_is_valid: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         enabled: true
@@ -420,6 +454,16 @@ speed_mask_filter_info_server:
     base: 1.5
     multiplier: -0.014
 
+controller_mask_filter_info_server:
+  ros__parameters:
+    use_sim_time: true
+    type: 3  # 3: binary
+    filter_info_topic: "/nav/controller_mask_filter_info"
+    mask_topic: "/nav/speed_filter_mask"
+    # speed range: 0.1 - 1.5
+    base: 1.5
+    multiplier: -0.014
+
 preferred_path_filter_info_server:
   ros__parameters:
     use_sim_time: true
@@ -428,3 +472,27 @@ preferred_path_filter_info_server:
     mask_topic: "/nav/preferred_path_map"
     base: 0.0
     multiplier: 1.0
+
+collision_detector:
+  ros__parameters:
+    use_sim_time: True
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    transform_tolerance: 0.5
+    source_timeout: 5.0
+    base_shift_correction: True
+    polygons: ["PolygonNearObstacles"]
+    PolygonNearObstacles:
+      type: "polygon"
+      points: [0.8, 0.3, 0.8, -0.3, -0.3, -0.3, -0.3, 0.3]
+      action_type: "none"
+      min_points: 4
+      visualize: True
+      polygon_pub_topic: "polygon_front"
+    observation_sources: ["front_scan", "rear_scan"]
+    front_scan:
+      type: "scan"
+      topic: "/front_lidar/scan"
+    rear_scan:
+      type: "scan"
+      topic: "/rear_lidar/scan"

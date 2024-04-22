@@ -63,6 +63,9 @@ REP 2014
 Performance test (communication - dds)
 - https://gitlab.com/ApexAI/performance_test/-/tree/master/performance_test?ref_type=heads
 
+### ROS2
+- sweet package problems: https://stackoverflow.com/questions/57426715/import-modules-in-package-in-ros2
+
 ### NAV2 benchmarking
 - peak Maci comments: https://discourse.ros.org/t/nav2-discussion-metrics-framework-for-quantitative-evaluation-of-navigation-performance/28082/
 

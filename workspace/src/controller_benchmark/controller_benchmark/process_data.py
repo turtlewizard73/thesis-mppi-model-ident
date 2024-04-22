@@ -325,18 +325,19 @@ def main():
                       '\n(m/s^6)']]
 
     for i in range(0, len(controllers)):
-        planner_table.append([controllers[i],
-                              np.sum(tasks_results[i]),
-                              np.average(speeds_x[i]),
-                              np.average(controller_paths_lenght[i]),
-                              np.average(task_times[i]),
-                              np.min(controller_obstacles_distances[i]),
-                              np.average(
-                                  controller_obstacles_distances_avg[i]),
-                              np.average(
-                                  controller_obstacles_distances_std[i]),
-                              np.average(controller_ME_linear_jerk[i]),
-                              np.average(controller_ME_angular_jerk[i])])
+        planner_table.append(
+            [controllers[i],
+             np.sum(tasks_results[i]),
+             np.average(speeds_x[i]),
+             np.average(controller_paths_lenght[i]),
+             np.average(task_times[i]),
+             np.min(controller_obstacles_distances[i]),
+             np.average(
+                controller_obstacles_distances_avg[i]),
+             np.average(
+                controller_obstacles_distances_std[i]),
+             np.average(controller_ME_linear_jerk[i]),
+             np.average(controller_ME_angular_jerk[i])])
     # Visualize results
     print("Planned average len: ", np.average(path_lengths))
     print("Total number of tasks: ", len(tasks_results))

@@ -26,8 +26,8 @@ services:
       - /dev:/dev
       - ./:/home/turtlewizard/thesis-mppi-model-ident
       - /tmp/.X11-unix:/tmp/.X11-unix
-      - ~/.gitconfig:/home/ubuntu/.gitconfig
-      - ~/.ssh:/home/ubuntu/.ssh
+      - ~/.gitconfig:/home/turtlewizard/.gitconfig
+      - ~/.ssh:/home/turtlewizard/.ssh
     group_add:
       - plugdev
 

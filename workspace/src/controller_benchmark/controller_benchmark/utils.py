@@ -25,6 +25,7 @@ class ControllerMetric:
     plan_idx: int
     plan_length: int  # length of the generated plan [m]
     plan: Path
+    result: bool
 
     controller_name: str
     length: float  # [m]
@@ -37,9 +38,9 @@ class ControllerMetric:
 
     lin_vel: List[float]  # [m/s]
     lin_vel_avg: float
-    lin_acc: List[float]  # [m^2/s]
+    lin_acc: List[float]  # [m/s^2]
     lin_acc_avg: float
-    lin_jerk: List[float]  # [m^3/2]
+    lin_jerk: List[float]  # [m/s^3]
     lin_jerk_avg: float
     lin_jerk_rms: float
 
