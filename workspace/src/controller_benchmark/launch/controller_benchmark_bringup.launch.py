@@ -1,9 +1,12 @@
 # Builtin modules
 import os
+from distutils.util import strtobool
 
 # ROS modules
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, IncludeLaunchDescription
+from launch.actions import (
+    ExecuteProcess, IncludeLaunchDescription, DeclareLaunchArgument)
+from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
@@ -17,12 +20,15 @@ def generate_launch_description():
     this_package_dir = get_package_share_directory('controller_benchmark')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
 
-    use_basic_config = False
-    use_gui = True
+    # nav_config_file = LaunchConfiguration('use_basic_config')
+    # use_basic_config = bool(strtobool(use_basic_config))
+    use_gui = LaunchConfiguration('use_gui')
 
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
-    nav_config = os.path.join(this_package_dir, 'nav2_params_mppi.yaml') if \
-        use_basic_config is False else os.path.join(this_package_dir, 'nav2_params.yaml')
+
+    # nav_config_file = 'nav2_params_mppi.yaml' if use_basic_config is False else 'nav2_params.yaml'
+    nav_config = os.path.join(this_package_dir, 'nav2_mppi_og.yaml')
+
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
     world = ''  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
 
@@ -53,6 +59,16 @@ def generate_launch_description():
             'R': '0.0', 'P': '0.0', 'Y': '0.0'}
 
     return LaunchDescription([
+        # DeclareLaunchArgument(
+        #     'config', default_value='nav2_params_mppi.yaml',
+        #     description='Whether to use default nav2 configuration.'
+        # ),
+
+        DeclareLaunchArgument(
+            'use_gui', default_value='true',
+            description='Whether to run gazebo headless.'
+        ),
+
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -126,7 +142,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(gazebo_dir, 'launch', 'gzclient.launch.py')),
-            condition=IfCondition(str(use_gui))),
+            condition=IfCondition(use_gui)),
 
         Node(
             package='robot_state_publisher',

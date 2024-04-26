@@ -77,3 +77,7 @@ Performance test (communication - dds)
 - install ros2: https://docs.ros.org/en/humble/How-To-Guides/Installing-on-Raspberry-Pi.html
 - multi platform build:https://stackoverflow.com/questions/59756123/use-buildx-build-linux-arm64-in-docker-compose-file
 - https://docs.docker.com/compose/compose-file/05-services/#platform
+
+### MPPI
+- maci at roscon: https://vimeo.com/showcase/10775523/video/879001391
+- pdf roscon: https://roscon.ros.org/2023/talks/On_Use_of_Nav2_MPPI_Controller.pdf

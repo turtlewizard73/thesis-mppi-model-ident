@@ -29,7 +29,6 @@ navigation_executor:
       - nav2_goal_checker_selector_bt_node
       - nav2_truncate_path_action_bt_node
       - send_string_bt_node
-      - play_sound_bt_node
       - send_float_bt_node
       - assert_localization_ok_bt_node
       - cmd_vel_relay_bt_node

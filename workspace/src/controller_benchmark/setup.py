@@ -13,9 +13,9 @@ setup(
         ('share/' + package_name, glob('launch/*')),
         ('share/' + package_name, glob('config/*')),
         ('share/' + package_name, glob('maps/*')),
-        ('lib/' + package_name, [package_name + '/utils.py']),
-        ('lib/' + package_name, [package_name + '/run_test.py']),
-        ('lib/' + package_name, [package_name + '/plot_results.py']),
+        # ('lib/' + package_name, [package_name + '/utils.py']),
+        # ('lib/' + package_name, [package_name + '/run_test.py']),
+        # ('lib/' + package_name, [package_name + '/plot_results.py']),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -25,9 +25,9 @@ setup(
     license='TODO: License declaration',
     tests_require=['pytest'],
     entry_points={
-        'console_scripts': [
-            'run_test = controller_benchmark.run_test:main',
-            'plot_results = controller_benchmark.plot_results:main'
-        ],
+        # 'console_scripts': [
+        #     'run_test = controller_benchmark.run_test:main',
+        #     'plot_results = controller_benchmark.plot_results:main'
+        # ],
     },
 )

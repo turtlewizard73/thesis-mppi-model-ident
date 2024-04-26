@@ -20,6 +20,13 @@
 ## 2024. 04. 14.
 - run_test.py and plot_results.py working
 
+## 2024. 04. 16.
+- started working on turtlebot
+  - what type of raspberry does it use?
+    - test in local and only copy image
+  - need of an sd card (min 16gb) and a reader
+  - next time bring own cable (ethernet)
+
 ## TODOs - 2024. 04. 10.
 - make gazebo gui headless?
 - IMPORT WHYY NOT WORKING???

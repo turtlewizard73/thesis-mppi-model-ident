@@ -24,17 +24,24 @@ RUN \
     apt-get update && \
     xargs -a dependencies-apt.txt apt install -y --no-install-recommends
 
+# Install newer libignition-math6 (6.15)
+RUN \
+    sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list' && \
+    wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add - && \
+    apt-get update && \
+    apt-get install libignition-math6-dev -y
+
+# Use Cyclone DDS as middleware
+RUN apt-get update && apt-get install -y --no-install-recommends \
+ ros-${ROS_DISTRO}-rmw-cyclonedds-cpp
+ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
 # Install additional Python modules
 COPY dependencies-pip.txt dependencies-pip.txt
 RUN \
     --mount=type=cache,target=/root/.cache/pip,mode=0777,sharing=locked \
     pip3 install -r dependencies-pip.txt
 # RUN pip3 install matplotlib transforms3d
-
-# Use Cyclone DDS as middleware
-RUN apt-get update && apt-get install -y --no-install-recommends \
- ros-${ROS_DISTRO}-rmw-cyclonedds-cpp
-ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 ##########################################
 # Underlay Image for rosdep dependencies #
