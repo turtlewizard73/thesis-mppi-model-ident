@@ -1,19 +1,19 @@
 #! /usr/bin/env python3
 
 from dataclasses import dataclass
-from typing import List, Any
+from typing import List, Any, Type
 
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
-from rclpy.parameter import Parameter
+from rclpy.parameter import parameter_value_to_python
 
 from std_srvs.srv import Empty
 from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
 from nav_msgs.msg import Path, OccupancyGrid
 from visualization_msgs.msg import MarkerArray, Marker
 from gazebo_msgs.srv import SetEntityState, GetEntityState
-from rcl_interfaces.msg import ParameterValue, ParameterType
+from rcl_interfaces.msg import Parameter, ParameterValue
 from rcl_interfaces.srv import GetParameters, SetParameters
 
 
@@ -210,50 +210,36 @@ class ParamInterface(Node):
         while not set_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
                 f'{server_name} service not available, waiting again...')
+
+        param_ = rclpy.parameter.Parameter(name=param_name, value=param_value)
         req = SetParameters.Request()
-
-        if isinstance(param_value, float):
-            val = ParameterValue(
-                double_value=param_value,
-                type=ParameterType.PARAMETER_DOUBLE)
-        elif isinstance(param_value, int):
-            val = ParameterValue(
-                integer_value=param_value,
-                type=ParameterType.PARAMETER_INTEGER)
-        elif isinstance(param_value, str):
-            val = ParameterValue(
-                string_value=param_value,
-                type=ParameterType.PARAMETER_STRING)
-        elif isinstance(param_value, bool):
-            val = ParameterValue(
-                bool_value=param_value,
-                type=ParameterType.PARAMETER_BOOL)
-        req.parameters = [Parameter(name=param_name, value=val)]
+        req.parameters = [param_.to_parameter_msg()]
         future = set_cli.call_async(req)
-
         rclpy.spin_until_future_complete(self, future)
         response = future.result()
-        assert response[0].successful
+
+        assert response.results[0].successful
         self.get_logger().info(f'Set {param_name} to {param_value}')
         return True
 
     def get_param(self, server_name: str, param_name: str) -> List:
+        # ros2 service call /local_costmap/local_costmap/get_parameters
+        # rcl_interfaces/srv/GetParameters  "{names: ["footprint_padding"]}"
         get_cli = self.create_client(
-            GetParameters, '/' + server_name + 'get_parameters')
+            GetParameters, '/' + server_name + '/' + 'get_parameters')
         while not get_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
                 f'{server_name} service not available, waiting again...')
 
         req = GetParameters.Request()
         req.names = [param_name]
-
         future = get_cli.call_async(req)
-
         rclpy.spin_until_future_complete(self, future)
         response = future.result()
+        self.get_logger().info(f'Got {param_name} as {response}')
 
-        assert response[0].successful
+        param_msg = response.values[0]
+        param_value = parameter_value_to_python(param_msg)
 
-        param_value = response.values[0]
         self.get_logger().info(f'Got {param_name} as {param_value}')
         return param_value

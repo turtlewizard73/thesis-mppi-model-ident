@@ -22,7 +22,7 @@ def generate_launch_description():
 
     # nav_config_file = LaunchConfiguration('use_basic_config')
     # use_basic_config = bool(strtobool(use_basic_config))
-    use_gui = LaunchConfiguration('use_gui')
+    gui = LaunchConfiguration('gui')
 
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
 
@@ -65,7 +65,7 @@ def generate_launch_description():
         # ),
 
         DeclareLaunchArgument(
-            'use_gui', default_value='true',
+            'gui', default_value='True',
             description='Whether to run gazebo headless.'
         ),
 
@@ -142,7 +142,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(gazebo_dir, 'launch', 'gzclient.launch.py')),
-            condition=IfCondition(use_gui)),
+            condition=IfCondition(gui)),
 
         Node(
             package='robot_state_publisher',
