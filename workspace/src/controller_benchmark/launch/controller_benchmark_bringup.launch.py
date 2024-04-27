@@ -5,7 +5,7 @@ from distutils.util import strtobool
 # ROS modules
 from launch import LaunchDescription
 from launch.actions import (
-    ExecuteProcess, IncludeLaunchDescription, DeclareLaunchArgument)
+    IncludeLaunchDescription, DeclareLaunchArgument)  # ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
