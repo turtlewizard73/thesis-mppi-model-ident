@@ -6,6 +6,6 @@ min_distance: 3.0  # [m]
 robot_length:  0.2  # along the x-axis of the robot [m]
 robot_width: 0.2  # along the y-axis [m]
 planner: 'GridBased'
-controllers: ['MPPI_example', 'MPPI_Maneuver']
+controllers: ['FollowPath', 'Maneuver']
 odom_topic: '/odom'
 costmap_topic: '/local_costmap/costmap'

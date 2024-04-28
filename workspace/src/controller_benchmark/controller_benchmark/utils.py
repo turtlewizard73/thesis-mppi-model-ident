@@ -33,35 +33,24 @@ class ControllerResult:
 
 @dataclass
 class ControllerMetric:
+    controller: str
     plan_idx: int
-    plan_length: int  # length of the generated plan [m]
-    plan: Path
+
+    # success metrics
     result: bool
+    distance_to_goal: float  # [m]
+    time: float  # [s]
 
-    controller_name: str
-    length: float  # [m]
-    diff_from_plan: float  # [m]
+    # trajectory metrics
+    plan_length: float  # [m]
+    traversed_length: float  # [m]
+    completion_ratio: float
 
-    x: List[float]  # [m]
-    y: List[float]  # [m]
-    dt_odom: List[float]  # [s]
-    dt_twist: List[float]  # [s]
-
-    lin_vel: List[float]  # [m/s]
-    lin_vel_avg: float
-    lin_acc: List[float]  # [m/s^2]
-    lin_acc_avg: float
-    lin_jerk: List[float]  # [m/s^3]
-    lin_jerk_avg: float
-    lin_jerk_rms: float
-
-    ang_vel: List[float]
-    ang_vel_avg: float
-    ang_acc: List[float]
-    ang_acc_avg: float
-    ang_jerk: List[float]
-    ang_jerk_avg: float
-    ang_jerk_rms: float
+    # dynamic metrics
+    avg_linear_vel: float  # [m/s]
+    avg_linear_acc: float  # [m/s^2]
+    ms_linear_jerk: float  # [m/s^3]
+    ms_angular_jerk: float  # [rad/s^3]
 
 
 class MarkerServer(Node):
@@ -236,7 +225,7 @@ class ParamInterface(Node):
         future = get_cli.call_async(req)
         rclpy.spin_until_future_complete(self, future)
         response = future.result()
-        self.get_logger().info(f'Got {param_name} as {response}')
+        # self.get_logger().info(f'Got {param_name} as {response}')
 
         param_msg = response.values[0]
         param_value = parameter_value_to_python(param_msg)

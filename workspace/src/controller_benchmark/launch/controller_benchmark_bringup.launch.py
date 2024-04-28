@@ -27,7 +27,7 @@ def generate_launch_description():
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
 
     # nav_config_file = 'nav2_params_mppi.yaml' if use_basic_config is False else 'nav2_params.yaml'
-    nav_config = os.path.join(this_package_dir, 'nav2_mppi_og.yaml')
+    nav_config = os.path.join(this_package_dir, 'nav2_mppi_test.yaml')
 
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
     world = ''  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')

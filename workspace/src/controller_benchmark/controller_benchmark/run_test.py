@@ -19,10 +19,8 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 # Ros message types
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path, Odometry, OccupancyGrid
-from nav2_msgs.msg import Costmap
 
-
-from controller_benchmark.utils import (
+from utils import (
     ControllerResult, MarkerServer, ParamInterface,
     CmdVelListener, ListenerBase, GazeboInterface)
 
@@ -54,11 +52,10 @@ def spin_executor(executor):
 def generate_random_goals(
         number_of_goals: int,
         min_distance: float,
-        global_costmap: Costmap,
+        global_costmap: np.ndarray,
+        resolution: float,
         robot_width: float,
         robot_length: float):
-
-    resolution = global_costmap.metadata.resolution
 
     start = PoseStamped()
     start.header.frame_id = 'map'
@@ -147,9 +144,11 @@ def main():
     nav.waitUntilNav2Active('planner_server', 'controller_server')
 
     param_interface = ParamInterface()
-    controller = param_interface.get_param(
-
-    )
+    controller_plugins = param_interface.get_param(
+        server_name='controller_server',
+        param_name='controller_plugins')
+    assert set(params['controllers']).issubset(controller_plugins), \
+        f'Present controllers: {controller_plugins}'
 
     marker_server_node = MarkerServer()
     vis_executor = rclpy.executors.MultiThreadedExecutor()
@@ -164,6 +163,7 @@ def main():
     # size_x: Number of cells in the horizontal direction
     # size_y: Number of cells in the vertical direction
     global_costmap_msg = nav.getGlobalCostmap()
+    resolution = global_costmap_msg.metadata.resolution
     global_costmap = np.asarray(global_costmap_msg.data)
     global_costmap.resize(
         global_costmap_msg.metadata.size_y, global_costmap_msg.metadata.size_x)
@@ -177,6 +177,7 @@ def main():
         number_of_goals=params['number_of_goals'],
         min_distance=params['min_distance'],
         global_costmap=global_costmap,
+        resolution=resolution,
         robot_width=params['robot_width'],
         robot_length=params['robot_length'])
     marker_server_node.publish_markers(goals)
@@ -245,12 +246,6 @@ def main():
                 nav_result = False
                 if (nav.getResult() == TaskResult.SUCCEEDED):
                     nav_result = True
-                elif (nav.getResult() == TaskResult.FAILED):
-                    nav_result = False
-                else:
-                    logger.info(
-                        f'{controller} unexpected result: {nav.getResult()}')
-                    nav_result = False
 
                 logger.info(
                     f'{controller} finished with result: {nav_result}, '
@@ -278,6 +273,7 @@ def main():
     # filename = '/controller_benchmark_results.pickle'
     with open(params['output_dir'] + filename, 'wb+') as f:
         pickle.dump(controller_results, f, pickle.HIGHEST_PROTOCOL)
+    logger.info(f'Written results to: {params["output_dir"] + filename}')
 
     logger.info('Controller benchmark finished')
 
