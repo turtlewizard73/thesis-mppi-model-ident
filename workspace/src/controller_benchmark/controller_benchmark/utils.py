@@ -26,8 +26,8 @@ class ControllerResult:
     start_time: float  # nanoseconds
     end_time: float  # nanoseconds
     result: bool
-    poses: List[PoseStamped]
-    twists: List[TwistStamped]
+    poses: List[PoseStamped]  # TODO: rename to odom
+    twists: List[TwistStamped]  # TODO: rename to cmd_vel
     costmaps: List[OccupancyGrid]
 
 
@@ -50,6 +50,9 @@ class ControllerMetric:
     avg_linear_vel: float  # [m/s]
     avg_linear_acc: float  # [m/s^2]
     ms_linear_jerk: float  # [m/s^3]
+
+    avg_angular_vel: float  # [rad/s]
+    avg_angular_acc: float  # [rad/s^2]
     ms_angular_jerk: float  # [rad/s^3]
 
 

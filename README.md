@@ -81,3 +81,17 @@ Performance test (communication - dds)
 ### MPPI
 - maci at roscon: https://vimeo.com/showcase/10775523/video/879001391
 - pdf roscon: https://roscon.ros.org/2023/talks/On_Use_of_Nav2_MPPI_Controller.pdf
+
+
+
+
+
+
+
+
+
+
+
+### pdf
+- some tool for planner banchmarking: https://arxiv.org/pdf/2105.01777
+- rms jerk: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3470860/

@@ -16,6 +16,7 @@
 - trajectory
   - similarity to the original (nem teljesen másfele ment)
     - only when there are no obstacles
+  - https://www.tandfonline.com/doi/full/10.1080/15481603.2021.1908927
   - angle of attack vector not changing rapidly (nem kacsázik)
 - driving
   - average velocity (linear, angular) - how close is it to max

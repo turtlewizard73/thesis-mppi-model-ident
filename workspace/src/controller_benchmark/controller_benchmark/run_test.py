@@ -268,7 +268,7 @@ def main():
     logger.info('Controllers finished')
 
     logger.info("Write Results...")
-    stamp = time.strftime("%Y-%m-%d-%H-%M")
+    stamp = time.strftime(params['timestamp_format'])
     filename = f'/controller_benchmark_results_{stamp}.pickle'
     # filename = '/controller_benchmark_results.pickle'
     with open(params['output_dir'] + filename, 'wb+') as f:

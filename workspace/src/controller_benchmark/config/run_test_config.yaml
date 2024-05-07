@@ -1,4 +1,5 @@
 output_dir: 'results'
+timestamp_format: '%Y-%m-%d-%H-%M'
 test_mode: 0  # 0 means multiple plan, 1 means one plan
 controller_runs: 5  # only when test_mode=1
 number_of_goals: 2
