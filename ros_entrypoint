@@ -1,0 +1,43 @@
+#!/bin/bash
+# set +a
+
+## Source ROS setup scripts
+if [ -f "/opt/ros/${ROS_DISTRO}/setup.bash" ]; then
+    source "/opt/ros/${ROS_DISTRO}/setup.bash"
+fi
+
+# if [ -f "${REPO_ROOT}/workspace/install/setup.bash" ]; then
+#     source "${REPO_ROOT}/workspace/install/setup.bash"
+# fi
+
+if [ -f ~/thesis-mppi-model-ident/workspace/install/setup.bash ]; then
+  source ~/thesis-mppi-model-ident/workspace/install/setup.bash
+fi
+
+if [ -f "/usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" ]; then
+    source "/usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash"
+fi
+
+## Init NodeStrategy to avoid autocomplete hang on first tab
+python3 -c "from ros2cli.node.strategy import NodeStrategy; NodeStrategy(None)"
+
+# Enable completion
+if [ -f $HOME/git-completion.bash ]; then
+    source $HOME/git-completion.bash
+fi
+
+if [ -f /etc/bash_completion ]; then
+    source /etc/bash_completion
+fi
+
+
+# aliases
+alias g='git status'
+alias gf='git fetch'
+alias rosbuild="
+    cd ~/thesis-mppi-model-ident/workspace &&
+    colcon build --symlink-install --cmake-args ' -DCMAKE_EXPORT_COMPILE_COMMANDS=ON'"
+
+
+# Execute the command passed into this entrypoint
+exec "$@"

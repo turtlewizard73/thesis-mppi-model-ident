@@ -21,7 +21,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
 RUN \
     --mount=type=cache,target=/var/cache/apt,mode=0777,sharing=locked \
     --mount=type=cache,target=/root/.cache/pip,mode=0777,sharing=locked \
-    apt-get update && \
+    apt-get update && apt-get upgrade -y && \
     xargs -a dependencies-apt.txt apt install -y --no-install-recommends
 
 # Install newer libignition-math6 (6.15)
@@ -56,7 +56,7 @@ RUN \
     --mount=type=cache,target=/var/cache/apt,mode=0777,sharing=locked \
     --mount=type=cache,target=/root/.ros/rosdep,mode=0777,sharing=locked \
     # rm -f /etc/apt/apt.conf.d/docker-clean && \
-    source /opt/ros/$ROS_DISTRO/setup.sh && \
+    source /opt/ros/$ROS_DISTRO/setup.bash && \
     apt-get update && \
     rosdep update && \
     rosdep install -y --from-paths src --ignore-src --rosdistro=$ROS_DISTRO
@@ -105,27 +105,31 @@ ARG GID=${UID}
 RUN \
     groupadd --gid $GID $USERNAME && \
     useradd --uid ${GID} --gid ${UID} --create-home ${USERNAME} && \
-    adduser ${USERNAME} sudo && \
+    # adduser ${USERNAME} sudo && \
     echo ${USERNAME} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${USERNAME} && \
     chmod 0440 /etc/sudoers.d/${USERNAME} && \
-    chown -R ${UID}:${GID} /home/${USERNAME}
+    chown -R ${USERNAME} /home/${USERNAME} && \
+    cp -r /root/.bashrc /home/${USERNAME}/
 
 # Set the ownership of the overlay workspace to the new user
-RUN chown -R ${UID}:${GID} /home/${USERNAME}/thesis-mppi-model-ident
+COPY ros_entrypoint /home/${USERNAME}/ros_entrypoint
+RUN chown -R ${UID}:${GID} /home/${USERNAME}
+RUN chmod +x /home/${USERNAME}/ros_entrypoint
 
 # Set the user and source entrypoint in the user's .bashrc file
 USER ${USERNAME}
+RUN \
+    curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash \
+            -o /home/${USERNAME}/git-completion.bash
 RUN echo "source /opt/ros/$ROS_DISTRO/setup.bash" \
     >> /home/${USERNAME}/.bashrc
 RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/workspace/install/setup.bash" \
     >> /home/${USERNAME}/.bashrc
-RUN echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" \
+RUN echo "source /home/${USERNAME}/thesis-mppi-model-ident/ros_entrypoint" \
     >> /home/${USERNAME}/.bashrc
-RUN echo "source /home/$USERNAME/thesis-mppi-model-ident/aliases.sh" \
-    >> /home/${USERNAME}/.bashrc
+
 RUN echo "export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:/opt/ros/$ROS_DISTRO/share/turtlebot3_gazebo/models" \
     >> /home/${USERNAME}/.bashrc
 
-COPY ros_entrypoint.sh ros_entrypoint.sh
-ENTRYPOINT [ "/ros_entrypoint.sh" ]
+ENTRYPOINT [ "/home/turtlewizard/ros_entrypoint" ]
 CMD ["bash"]

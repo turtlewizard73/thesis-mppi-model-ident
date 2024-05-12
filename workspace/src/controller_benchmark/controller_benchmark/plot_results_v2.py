@@ -1,4 +1,7 @@
 #! /usr/bin/env python3
+import sys
+print(sys.path)
+sys.path.append("/home/turtlewizard/thesis-mppi-model-ident/workspace")
 
 # Common modules
 import os
@@ -20,6 +23,7 @@ from rclpy.time import Time
 from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 
+from discrete import FastDiscreteFrechetMatrix
 from utils import ControllerResult, ControllerMetric
 
 this_package_dir = get_package_share_directory('controller_benchmark')
