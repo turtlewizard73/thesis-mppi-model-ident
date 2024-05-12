@@ -10,7 +10,7 @@ from rclpy.parameter import parameter_value_to_python
 
 from std_srvs.srv import Empty
 from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
-from nav_msgs.msg import Path, OccupancyGrid
+from nav_msgs.msg import Path, OccupancyGrid, Odometry
 from visualization_msgs.msg import MarkerArray, Marker
 from gazebo_msgs.srv import SetEntityState, GetEntityState
 from rcl_interfaces.msg import Parameter, ParameterValue
@@ -21,19 +21,19 @@ from rcl_interfaces.srv import GetParameters, SetParameters
 class ControllerResult:
     controller_name: str
     plan_idx: int
-    plan: Path  # containes starting position?
+    plan: Path  # contains starting position?
     run: int
     start_time: float  # nanoseconds
     end_time: float  # nanoseconds
     result: bool
-    poses: List[PoseStamped]  # TODO: rename to odom
-    twists: List[TwistStamped]  # TODO: rename to cmd_vel
+    odom: List[Odometry]  # TODO: rename to odom
+    cmd_vel: List[TwistStamped]  # TODO: rename to cmd_vel
     costmaps: List[OccupancyGrid]
 
 
 @dataclass
 class ControllerMetric:
-    controller: str
+    controller_name: str
     plan_idx: int
 
     # success metrics

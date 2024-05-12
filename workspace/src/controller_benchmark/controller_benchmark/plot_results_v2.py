@@ -9,6 +9,7 @@ from typing import Dict, List
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import linalg
+import pandas as pd
 from tabulate import tabulate
 
 # Ros related modules
@@ -17,34 +18,28 @@ from ament_index_python.packages import get_package_share_directory
 from rclpy.time import Time
 
 from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped
+from nav_msgs.msg import Odometry
 
 from utils import ControllerResult, ControllerMetric
 
 this_package_dir = get_package_share_directory('controller_benchmark')
 map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
-config_file = os.path.join(this_package_dir, 'run_test_config.yaml')
+config_file = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'config', 'run_test_config.yaml')
 params = yaml.safe_load(open(config_file))
-
 params['output_dir'] = os.path.join(
     os.path.dirname(__file__), params['output_dir'])
 
 logger = logging.get_logger('controller_benchmark')
 
 
-def dist_2d(p1, p2) -> float:
-    # if p1 nad p2 are PoseStamped
-    if isinstance(p1, PoseStamped) and isinstance(p2, PoseStamped):
-        return linalg.norm(
-            np.array([p1.pose.position.x,
-                      p1.pose.position.y]) -
-            np.array([p2.pose.position.x,
-                      p2.pose.position.y]))
-    elif isinstance(p1, PoseWithCovarianceStamped) and isinstance(p2, PoseWithCovarianceStamped):
-        return linalg.norm(
-            np.array([p1.pose.pose.position.x,
-                      p1.pose.pose.position.y]) -
-            np.array([p2.pose.pose.position.x,
-                      p2.pose.pose.position.y]))
+def get_xy(p) -> np.ndarray:
+    if isinstance(p, PoseStamped):
+        return np.array([p.pose.position.x, p.pose.position.y])
+    elif isinstance(p, PoseWithCovarianceStamped):
+        return np.array([p.pose.pose.position.x, p.pose.pose.position.y])
+    elif isinstance(p, Odometry):
+        return np.array([p.pose.pose.position.x, p.pose.pose.position.y])
 
 
 def time_diff(t1: Time, t2: Time) -> float:
@@ -57,7 +52,7 @@ def dist_fullplan(plan: List) -> float:
     p_last = plan[0]
     for i in range(1, len(plan)):
         p = plan[i]
-        length += dist_2d(p_last, p)
+        length += linalg.norm(get_xy(p_last) - get_xy(p))
         p_last = p
     return length
 
@@ -78,28 +73,30 @@ def main():
     # collecting meterics
     controller_metrics: List[ControllerMetric] = []
     for result in controller_results:
-        distance_to_goal = dist_2d(
-            result.plan.poses[-1], result.poses[-1])
+        distance_to_goal = linalg.norm(
+            get_xy(result.plan.poses[-1]) - get_xy(result.odom[-1]))
 
         time = time_diff(
-            result.twists[0].header.stamp, result.twists[-1].header.stamp)
+            result.cmd_vel[0].header.stamp, result.cmd_vel[-1].header.stamp)
 
+        print(result.plan.poses[0])
+        print(result.plan.poses[-1])
         plan_length = dist_fullplan(result.plan.poses)
-        traversed_length = dist_fullplan(result.poses)
+        traversed_length = dist_fullplan(result.odom)
         completion_ratio = (traversed_length - plan_length) / plan_length
 
-        dt = [Time.from_msg(t.header.stamp) for t in result.twists]
+        dt = [Time.from_msg(t.header.stamp).nanoseconds * 1e-9 for t in result.cmd_vel]
         dt = [t - dt[0] for t in dt]
-        vel_lin = [v.twist.linear.x for v in result.twists]
+        vel_lin = [v.twist.linear.x for v in result.cmd_vel]
         acc_lin = np.gradient(vel_lin, dt)
         jerk_lin = np.gradient(vel_lin, dt)
 
-        vel_ang = [v.twist.angular.z for v in result.twists]
+        vel_ang = [v.twist.angular.z for v in result.cmd_vel]
         acc_ang = np.gradient(vel_ang, dt)
         jerk_ang = np.gradient(vel_ang, dt)
 
         metric = ControllerMetric(
-            controller=result.controller_name,
+            controller_name=result.controller_name,
             plan_idx=result.plan_idx,
             result=result.result,
             distance_to_goal=distance_to_goal,
@@ -124,14 +121,16 @@ def main():
             single_controller_metrics[metric.controller_name] = []
         single_controller_metrics[metric.controller_name].append(metric)
 
-    table = [[
-        'Controller', 'Succes rate', 'Distance to goal [m]', 'Time [s]'
+    table = {'Metrics': [
+        'Succes rate', 'Distance to goal [m]', 'Time [s]',
         'Avarage lin speed [m/s]', 'Avarage ang speed [m/s]',
         'Avarage lin acc [m/s^2]', 'Avarage ang acc [rad/s^2]',
         'Avarage lin jerk rms [m/s^3]', 'Avarage ang jerk rms [rad/s^3]',
-    ]]
-    n = len(controller_metrics)
+    ]}
+    df = pd.DataFrame(table)
     for controller, controller_metrics in single_controller_metrics.items():
+        n = len(controller_metrics)
+
         success_rate = sum(
             1 for m in controller_metrics if m.result is True) / n
         d_to_goal = sum(
@@ -150,15 +149,15 @@ def main():
         avg_ang_jerk = sum(
             [m.ms_angular_jerk for m in controller_metrics]) / n
 
-        table.append([
-            controller, success_rate, d_to_goal, time,
+        df[controller] = [
+            success_rate, d_to_goal, time,
             avg_lin_vel, avg_ang_vel,
             avg_lin_acc, avg_ang_acc,
-            avg_lin_jerk, avg_ang_jerk])
+            avg_lin_jerk, avg_ang_jerk]
 
     logger.info('\n' + tabulate(
-        np.array(table).T.tolist(),
-        headers="firstrow", showindex="always", floatfmt=".5f", tablefmt="github"))
+        df, stralign="right",
+        headers="keys", showindex="always", floatfmt=".5f", tablefmt="github"))
 
 
 if __name__ == '__main__':

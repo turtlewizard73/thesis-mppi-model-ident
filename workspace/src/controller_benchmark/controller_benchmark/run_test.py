@@ -27,7 +27,9 @@ from utils import (
 
 this_package_dir = get_package_share_directory('controller_benchmark')
 map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
-config_file = os.path.join(this_package_dir, 'run_test_config.yaml')
+# TODO: make config file importable before
+config_file = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'config', 'run_test_config.yaml')
 params = yaml.safe_load(open(config_file))
 
 # make directory for results
@@ -35,7 +37,7 @@ params['output_dir'] = os.path.join(
     os.path.dirname(__file__), params['output_dir'])
 os.makedirs(params['output_dir'], exist_ok=True)
 params['controller_runs'] = \
-    1 if params['test_mode'] == 0 else params['controller_runs']
+    1 if params['number_of_goals'] == 1 else params['controller_runs']
 
 logger = rclpy.logging.get_logger('controller_benchmark')
 
@@ -125,11 +127,15 @@ def generate_random_goals(
         goal.pose.position.y = goal_y
 
         q = Rotation.from_euler(
-            'zyx', [yaw, 0., 0.], degrees=False).as_quat()
-        goal.pose.orientation.w = q[0]
-        goal.pose.orientation.x = q[1]
-        goal.pose.orientation.y = q[2]
-        goal.pose.orientation.z = q[3]
+            'XYZ', [0., 0., yaw], degrees=False).as_quat()
+        goal.pose.orientation.x = q[0]
+        goal.pose.orientation.y = q[1]
+        goal.pose.orientation.z = q[2]
+        goal.pose.orientation.w = q[3]
+
+        # q = Quaternion()
+        # q.setRPY(0, 0, yaw)
+        # goal.pose.orientation = q
 
         random_goals.append(goal)
 
@@ -195,6 +201,7 @@ def main():
         if number_of_generation > 10 * params['number_of_goals']:
             logger.error(f'Cannot generate global plan for goal: {goal}')
 
+        nav.clearGlobalCostmap()
         global_plan = nav.getPath(start, goal, planner, use_start=True)
         if global_plan is None:
             continue
@@ -229,6 +236,7 @@ def main():
         for controller in params['controllers']:
             for j in range(params['controller_runs']):
                 gazebo_interface_node.reset_world()
+                nav.clearLocalCostmap()
                 time.sleep(0.5)
 
                 nav.clearLocalCostmap()
@@ -259,8 +267,8 @@ def main():
                     start_time=start_time.nanoseconds,
                     end_time=end_time.nanoseconds,
                     result=nav_result,
-                    poses=odom_sub_node.get_msgs(start_time, end_time),
-                    twists=cmd_vel_sub_node.get_msgs(start_time, end_time),
+                    odom=odom_sub_node.get_msgs(start_time, end_time),
+                    cmd_vel=cmd_vel_sub_node.get_msgs(start_time, end_time),
                     costmaps=costmap_sub_node.get_msgs(start_time, end_time)
                 ))
                 gazebo_interface_node.reset_world()
