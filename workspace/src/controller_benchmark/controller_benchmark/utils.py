@@ -45,6 +45,7 @@ class ControllerMetric:
     plan_length: float  # [m]
     traversed_length: float  # [m]
     completion_ratio: float
+    frechet_dist: float
 
     # dynamic metrics
     avg_linear_vel: float  # [m/s]

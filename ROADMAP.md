@@ -27,13 +27,19 @@
   - need of an sd card (min 16gb) and a reader
   - next time bring own cable (ethernet)
 
+## 2024. 05. 12.
+- fixed container bashrc
+- fixed container entrypoint
+- fixed container ros2 install update -> nav2 added as rosdep
+- added frechet module to calculate plan and route distance
+
 ## TODOs - 2024. 04. 10.
-- make gazebo gui headless?
-- IMPORT WHYY NOT WORKING???
+- make gazebo gui headless? - done
+- IMPORT WHYY NOT WORKING??? - working
 - finish run_test.py
   - parametrize
   - think about number of retries
-- separate important configs to yaml file
+- separate important configs to yaml file - done
   - those that importatnly needded for run_test.py
   - for example: publish twist stamped true
   - to override given params.yaml

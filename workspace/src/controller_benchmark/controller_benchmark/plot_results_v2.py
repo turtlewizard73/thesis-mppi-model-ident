@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 import sys
-print(sys.path)
-sys.path.append("/home/turtlewizard/thesis-mppi-model-ident/workspace")
+sys.path.append("/home/turtlewizard/thesis-mppi-model-ident/workspace/install/controller_benchmark/lib/controller_benchmark")
+# print(sys.path)
 
 # Common modules
 import os
@@ -23,7 +23,7 @@ from rclpy.time import Time
 from geometry_msgs.msg import Pose, PoseStamped, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 
-from discrete import FastDiscreteFrechetMatrix
+from discrete import FastDiscreteFrechetMatrix, euclidean as euclidean_dist
 from utils import ControllerResult, ControllerMetric
 
 this_package_dir = get_package_share_directory('controller_benchmark')
@@ -83,8 +83,6 @@ def main():
         time = time_diff(
             result.cmd_vel[0].header.stamp, result.cmd_vel[-1].header.stamp)
 
-        print(result.plan.poses[0])
-        print(result.plan.poses[-1])
         plan_length = dist_fullplan(result.plan.poses)
         traversed_length = dist_fullplan(result.odom)
         completion_ratio = (traversed_length - plan_length) / plan_length
@@ -99,6 +97,11 @@ def main():
         acc_ang = np.gradient(vel_ang, dt)
         jerk_ang = np.gradient(vel_ang, dt)
 
+        fdfdm = FastDiscreteFrechetMatrix(euclidean_dist)
+        plan = np.array([get_xy(p) for p in result.plan.poses])
+        route = np.array([get_xy(p) for p in result.odom])
+        frechet_dist = fdfdm.distance(plan, route)
+
         metric = ControllerMetric(
             controller_name=result.controller_name,
             plan_idx=result.plan_idx,
@@ -108,6 +111,7 @@ def main():
             plan_length=plan_length,
             traversed_length=traversed_length,
             completion_ratio=completion_ratio,
+            frechet_dist=frechet_dist,
             avg_linear_vel=np.mean(vel_lin),
             avg_linear_acc=np.mean(acc_lin),
             ms_linear_jerk=np.sqrt(np.mean(jerk_lin**2)),
@@ -126,12 +130,13 @@ def main():
         single_controller_metrics[metric.controller_name].append(metric)
 
     table = {'Metrics': [
-        'Succes rate', 'Distance to goal [m]', 'Time [s]',
+        'Succes rate', 'Distance to goal [m]', 'Time [s]', 'Frechet distance [m]',
         'Avarage lin speed [m/s]', 'Avarage ang speed [m/s]',
         'Avarage lin acc [m/s^2]', 'Avarage ang acc [rad/s^2]',
         'Avarage lin jerk rms [m/s^3]', 'Avarage ang jerk rms [rad/s^3]',
     ]}
     df = pd.DataFrame(table)
+    results_str = 'Results: '
     for controller, controller_metrics in single_controller_metrics.items():
         n = len(controller_metrics)
 
@@ -140,25 +145,28 @@ def main():
         d_to_goal = sum(
             m.distance_to_goal for m in controller_metrics) / n
         time = sum(m.time for m in controller_metrics) / n
+        frechet_dist = sum(m.frechet_dist for m in controller_metrics) / n
         avg_lin_vel = sum(
-            [m.avg_linear_vel for m in controller_metrics]) / n
+            m.avg_linear_vel for m in controller_metrics) / n
         avg_ang_vel = sum(
-            [m.avg_angular_vel for m in controller_metrics]) / n
+            m.avg_angular_vel for m in controller_metrics) / n
         avg_lin_acc = sum(
-            [m.avg_linear_acc for m in controller_metrics]) / n
+            m.avg_linear_acc for m in controller_metrics) / n
         avg_ang_acc = sum(
-            [m.avg_angular_acc for m in controller_metrics]) / n
+            m.avg_angular_acc for m in controller_metrics) / n
         avg_lin_jerk = sum(
-            [m.ms_linear_jerk for m in controller_metrics]) / n
+            m.ms_linear_jerk for m in controller_metrics) / n
         avg_ang_jerk = sum(
-            [m.ms_angular_jerk for m in controller_metrics]) / n
+            m.ms_angular_jerk for m in controller_metrics) / n
 
+        results_str += f'{controller}: {n} '
         df[controller] = [
-            success_rate, d_to_goal, time,
+            success_rate, d_to_goal, time, frechet_dist,
             avg_lin_vel, avg_ang_vel,
             avg_lin_acc, avg_ang_acc,
             avg_lin_jerk, avg_ang_jerk]
 
+    logger.info(results_str)
     logger.info('\n' + tabulate(
         df, stralign="right",
         headers="keys", showindex="always", floatfmt=".5f", tablefmt="github"))

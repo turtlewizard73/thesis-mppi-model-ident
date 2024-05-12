@@ -82,9 +82,11 @@ Performance test (communication - dds)
 - maci at roscon: https://vimeo.com/showcase/10775523/video/879001391
 - pdf roscon: https://roscon.ros.org/2023/talks/On_Use_of_Nav2_MPPI_Controller.pdf
 
-
-
-
+### Frechet distance
+- https://courses.cs.duke.edu/spring07/cps296.2/scribe_notes/lecture23.pdf
+- discrete: http://www.kr.tuwien.ac.at/staff/eiter/et-archive/cdtr9464.pdf
+- repo: https://github.com/joaofig/discrete-frechet/blob/master/distances/discrete.py
+- easy stackoverflow: https://stackoverflow.com/questions/39374514/fr%C3%A9chet-distance-of-2-trajectories
 
 
 
