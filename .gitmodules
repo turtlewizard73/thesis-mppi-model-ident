@@ -2,3 +2,6 @@
 	path = workspace/src/navigation2
 	url = git@github.com:turtlewizard73/navigation2.git
 	branch = humble
+[submodule "workspace/src/controller_benchmark/include/discrete-frechet"]
+	path = workspace/src/controller_benchmark/include/discrete-frechet
+	url = https://github.com/joaofig/discrete-frechet.git
