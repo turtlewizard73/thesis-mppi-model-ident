@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from typing import List, Any, Type
+import numpy as np
 
 import rclpy
 from rclpy.node import Node
@@ -55,6 +56,14 @@ class ControllerMetric:
     avg_angular_vel: float  # [rad/s]
     avg_angular_acc: float  # [rad/s^2]
     ms_angular_jerk: float  # [rad/s^3]
+
+    # raw data in case of further analysis
+    plan_poses: np.ndarray
+    route_poses: np.ndarray
+
+    time_steps: List[float]
+    linear_jerks: List[float]
+    angular_jerks: List[float]
 
 
 class MarkerServer(Node):
