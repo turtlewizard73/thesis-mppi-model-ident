@@ -3,3 +3,5 @@ seaborn
 tabulate
 
 numba
+psutil
+memory_profiler

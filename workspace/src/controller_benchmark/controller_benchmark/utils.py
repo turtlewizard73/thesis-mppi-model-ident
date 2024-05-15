@@ -1,14 +1,18 @@
 #! /usr/bin/env python3
 
+# Common modules
+import os
 from dataclasses import dataclass
 from typing import List, Any, Type
 import numpy as np
 
+# ROS related modules
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.parameter import parameter_value_to_python
 
+# ROS message types
 from std_srvs.srv import Empty
 from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
 from nav_msgs.msg import Path, OccupancyGrid, Odometry
@@ -16,6 +20,12 @@ from visualization_msgs.msg import MarkerArray, Marker
 from gazebo_msgs.srv import SetEntityState, GetEntityState
 from rcl_interfaces.msg import Parameter, ParameterValue
 from rcl_interfaces.srv import GetParameters, SetParameters
+
+
+# benchmark
+import psutil
+import memory_profiler
+from time import time as python_time
 
 
 @dataclass
@@ -64,6 +74,42 @@ class ControllerMetric:
     time_steps: List[float]
     linear_jerks: List[float]
     angular_jerks: List[float]
+
+
+def measure_resource_usage(func):
+    def wrapper(*args, **kwargs):
+        process = psutil.Process(os.getpid())
+
+        # Measure initial memory usage
+        initial_memory = memory_profiler.memory_usage()[0]
+
+        # Measure initial CPU time
+        initial_cpu_times = process.cpu_times()
+        initial_cpu_user_time = initial_cpu_times.user
+
+        start_time = python_time()
+        result = func(*args, **kwargs)
+        end_time = python_time()
+
+        # Measure final memory usage
+        final_memory = memory_profiler.memory_usage()[0]
+
+        # Measure final CPU time
+        final_cpu_times = process.cpu_times()
+        final_cpu_user_time = final_cpu_times.user
+
+        # Calculate memory and CPU usage
+        memory_usage = final_memory - initial_memory
+        cpu_usage = final_cpu_user_time - initial_cpu_user_time
+        execution_time = end_time - start_time
+
+        print(f"{func.__name__} Memory usage: {memory_usage} MiB")
+        print(f"{func.__name__} CPU usage: {cpu_usage} seconds")
+        print(f"{func.__name__} Execution time: {execution_time} seconds")
+
+        return result
+
+    return wrapper
 
 
 class MarkerServer(Node):

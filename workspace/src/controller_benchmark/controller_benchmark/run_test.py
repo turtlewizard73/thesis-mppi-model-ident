@@ -11,12 +11,12 @@ from typing import List, Type, Dict
 import pickle
 import yaml
 
-# Ros related modules
+# ROS related modules
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
-# Ros message types
+# ROS message types
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path, Odometry, OccupancyGrid
 

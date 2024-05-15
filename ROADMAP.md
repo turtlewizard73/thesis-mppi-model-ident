@@ -33,6 +33,15 @@
 - fixed container ros2 install update -> nav2 added as rosdep
 - added frechet module to calculate plan and route distance
 
+## 2024. 05. 15.
+- optimized:
+  - plot_results_v2.py - dist_fullplan -> np array
+  - maketh benchmark decorator
+    - found that fdfdm eats a lot of memory -> one object (global)
+  - calculate_metrics with ProcessPoolExecutor paralellized
+
+TODO: outlier filtering for points, and interpolate the filtered values
+
 ## TODOs - 2024. 04. 10.
 - make gazebo gui headless? - done
 - IMPORT WHYY NOT WORKING??? - working
