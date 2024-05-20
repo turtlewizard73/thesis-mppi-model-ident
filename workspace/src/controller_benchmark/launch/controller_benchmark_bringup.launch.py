@@ -54,7 +54,7 @@ def generate_launch_description():
     # -------------------------------------------------------------------------------------
 
     robot_name = 'turtlebot3_waffle'
-    robot_sdf = os.path.join(nav2_bringup_dir, 'worlds', 'waffle.model')
+    robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
     pose = {'x': '0.0', 'y': '0.0', 'z': '0.0',
             'R': '0.0', 'P': '0.0', 'Y': '0.0'}
 

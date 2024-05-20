@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name, glob('launch/*')),
         ('share/' + package_name, glob('config/*')),
         ('share/' + package_name, glob('maps/*')),
+        ('share/' + package_name, glob('models/*')),
         ('lib/' + package_name,
          ['include/discrete-frechet/distances/discrete.py']),
         # ('lib/' + package_name, [package_name + '/utils.py']),
