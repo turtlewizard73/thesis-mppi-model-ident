@@ -26,7 +26,6 @@ from utils import (
 
 
 this_package_dir = get_package_share_directory('controller_benchmark')
-map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
 # TODO: make config file importable before
 config_file = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), 'config', 'run_test_config.yaml')
@@ -64,12 +63,12 @@ def generate_random_goals(
     # start.header.stamp = nav.get_clock().now().to_msg()
     start.pose.position.x = 0.0
     start.pose.position.y = 0.0
-    q = Rotation.from_euler(
-        'zyx', [0., 0., 0.], degrees=False).as_quat()
-    start.pose.orientation.w = q[0]
-    start.pose.orientation.x = q[1]
-    start.pose.orientation.y = q[2]
-    start.pose.orientation.z = q[3]
+
+    q = Rotation.from_euler('XYZ', [0., 0., 0.], degrees=False).as_quat()
+    start.pose.orientation.x = q[0]
+    start.pose.orientation.y = q[1]
+    start.pose.orientation.z = q[2]
+    start.pose.orientation.w = q[3]
 
     random_goals = []
     number_of_generation = 0
@@ -101,7 +100,7 @@ def generate_random_goals(
                 global_costmap.shape[1] <= goal_x:
             continue
 
-        # check if robot can reach goal
+        # check if robot can reach goal (if not free skip)
         if global_costmap[goal_y, goal_x] != 0:
             continue
 
@@ -126,16 +125,11 @@ def generate_random_goals(
         goal.pose.position.x = goal_x
         goal.pose.position.y = goal_y
 
-        q = Rotation.from_euler(
-            'XYZ', [0., 0., yaw], degrees=False).as_quat()
+        q = Rotation.from_euler('XYZ', [0., 0., yaw], degrees=False).as_quat()
         goal.pose.orientation.x = q[0]
         goal.pose.orientation.y = q[1]
         goal.pose.orientation.z = q[2]
         goal.pose.orientation.w = q[3]
-
-        # q = Quaternion()
-        # q.setRPY(0, 0, yaw)
-        # goal.pose.orientation = q
 
         random_goals.append(goal)
 
@@ -162,8 +156,9 @@ def main():
     vis_executor_thread = Thread(target=vis_executor.spin, daemon=True)
     vis_executor_thread.start()
 
-    # nav.changeMap(map_file)
-    # time.sleep(2)
+    nav.changeMap(os.path.join(this_package_dir, params['map_file']))
+    nav.clearAllCostmaps()
+    time.sleep(2)
 
     # Get global costmap for goal generation
     # size_x: Number of cells in the horizontal direction
@@ -187,6 +182,7 @@ def main():
         robot_width=params['robot_width'],
         robot_length=params['robot_length'])
     marker_server_node.publish_markers(goals)
+    nav.setInitialPose(start)
     # logger.info(f'Generated goals, from {number_of_generation} tries: {goals}')
 
     # Generating global plans
