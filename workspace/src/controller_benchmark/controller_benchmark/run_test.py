@@ -30,6 +30,9 @@ this_package_dir = get_package_share_directory('controller_benchmark')
 config_file = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), 'config', 'run_test_config.yaml')
 params = yaml.safe_load(open(config_file))
+map_file = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'maps', params['map_file'])
+params['map'] = yaml.safe_load(open(map_file))
 
 # make directory for results
 params['output_dir'] = os.path.join(
@@ -37,6 +40,7 @@ params['output_dir'] = os.path.join(
 os.makedirs(params['output_dir'], exist_ok=True)
 params['controller_runs'] = \
     1 if params['number_of_goals'] == 1 else params['controller_runs']
+params['robot_radius'] = np.sqrt(params['robot_width'] ** 2 + params['robot_length'] ** 2)
 
 logger = rclpy.logging.get_logger('controller_benchmark')
 
@@ -87,6 +91,103 @@ def get_random_free_pose(
     pose.pose.orientation.z = q[2]
     pose.pose.orientation.w = q[3]
 
+    return pose
+
+
+def check_pose_free(x: float, y: float, costmap: np.ndarray, res: float) -> bool:
+    robot_radius = np.sqrt(
+        params['robot_width'] ** 2 + params['robot_length'] ** 2)
+
+    # check if footprint is free by using turn radius
+    roi = costmap[
+        int((y - robot_radius) / res):int((y + robot_radius) / res),
+        int((x - robot_radius) / res):int((x + robot_radius) / res)]
+    return np.average(roi) == 0
+
+
+def check_poses_free(
+        x: np.ndarray, y: np.ndarray, costmap: np.ndarray, res: float) -> np.ndarray:
+    turning_radius = params['robot_radius']
+    # convert xy to costmap origin
+    x = x - params['map']['origin'][0]
+    y = y - params['map']['origin'][1]
+
+    # Calculate the bounding box coordinates for each (x, y) pair
+    x_min = ((x - turning_radius) / res).astype(int)
+    x_max = ((x + turning_radius) / res).astype(int)
+    y_min = ((y - turning_radius) / res).astype(int)
+    y_max = ((y + turning_radius) / res).astype(int)
+
+    # Get costmap dimensions
+    costmap_height, costmap_width = costmap.shape
+
+    # Check if the coordinates are within bounds of the costmap
+    within_bounds = (x_min > 0) & (x_max < costmap_width) & \
+        (y_min > 0) & (y_max < costmap_height)
+
+    # Initialize result array to False
+    results = np.zeros(x.shape, dtype=bool)
+
+    # Create a mask for coordinates that are within bounds
+    valid_indices = np.where(within_bounds)[0]
+
+    for i in valid_indices:
+        roi = costmap[y_min[i]:y_max[i], x_min[i]:x_max[i]]
+        results[i] = np.average(roi) == 0
+
+    return results
+
+
+def get_random_free_pose_polar(
+        global_costmap: np.ndarray,
+        resolution: float,
+        start_pose: PoseStamped = None,
+        min_distance: float = None) -> PoseStamped:
+
+    radius = 0.0 if min_distance is None else min_distance
+    points_to_generate = int(radius * 4) if radius > params['robot_radius'] else 2
+
+    start_x = 0.0 if start_pose is None else start_pose.pose.position.x
+    start_y = 0.0 if start_pose is None else start_pose.pose.position.y
+
+    MAX_RETRY = 100
+    retries = 0
+    while True:
+        retries += 1
+        if retries > MAX_RETRY:
+            logger.error('Cannot find free pose')
+            return None
+
+        angles = np.random.rand(points_to_generate) * 2 * np.pi
+        # TODO: make radius random from min_distance to costmap size - robot_radius
+        # if radies becomes bigger then costmap size maybe?
+        x = radius * np.cos(angles) + start_x
+        y = radius * np.sin(angles) + start_y
+
+        free = check_poses_free(x, y, global_costmap, resolution)
+        if np.any(free):
+            index = np.argmax(free)
+            x = x[index]
+            y = y[index]
+            yaw = angles[index]
+            break
+
+        radius += params['robot_radius'] / 2
+        # TODO: maximalize radius in costmap size - robot_radius
+
+        points_to_generate = int(radius * 4)
+
+    pose = PoseStamped()
+    pose.header.frame_id = 'map'
+    pose.pose.position.x = x
+    pose.pose.position.y = y
+    q = Rotation.from_euler('XYZ', [0., 0., yaw], degrees=False).as_quat()
+    pose.pose.orientation.x = q[0]
+    pose.pose.orientation.y = q[1]
+    pose.pose.orientation.z = q[2]
+    pose.pose.orientation.w = q[3]
+    return pose
+
 
 def main():
     logger.info('Controller benchmark started')
@@ -126,8 +227,7 @@ def main():
 
     # Generate random start
     logger.info('Generating starting pose...')
-    start_pose = get_random_free_pose(
-        global_costmap, resolution, params['robot_width'], params['robot_length'])
+    start_pose = get_random_free_pose_polar(global_costmap, resolution)
     marker_server_node.publish_markers([start_pose], 'start')
 
     # Generate random goals and plans
@@ -138,19 +238,19 @@ def main():
     number_of_generation = 0
     while len(random_goals) < params['number_of_goals']:
         number_of_generation += 1
-        if number_of_generation > 100 * params['number_of_goals']:
+        if number_of_generation > 1000 * params['number_of_goals']:
             logger.error('Cannot find enough goals')
             break
 
-        goal_pose = get_random_free_pose(
-            global_costmap, resolution, params['robot_width'], params['robot_length'])
+        goal_pose = get_random_free_pose_polar(
+            global_costmap, resolution, start_pose, params['min_distance'])
 
         # check if min distance is kept
-        distance = np.sqrt(
-            (goal_pose.pose.position.x - start_pose.pose.position.x) ** 2 +
-            (goal_pose.pose.position.y - start_pose.pose.position.y) ** 2)
-        if distance < params['min_distance']:
-            continue
+        # distance = np.sqrt(
+        #     (goal_pose.pose.position.x - start_pose.pose.position.x) ** 2 +
+        #     (goal_pose.pose.position.y - start_pose.pose.position.y) ** 2)
+        # if distance < params['min_distance']:
+        #     continue
 
         nav.clearGlobalCostmap()
         time.sleep(0.5)
@@ -166,15 +266,10 @@ def main():
     logger.info(f'Generated global plans, from {number_of_generation}')
     marker_server_node.publish_markers(random_goals)
 
-    nav.setInitialPose(start_pose)
-
-    # Start navigation for each plan
-    logger.info('Running controllers through plans...')
+    logger.info('Preparing navigation...')
     cmd_vel_sub_node = CmdVelListener()
-    odom_sub_node = ListenerBase(
-        'odom_subscriber', params['odom_topic'], Odometry)
-    costmap_sub_node = ListenerBase(
-        'costmap_sub', params['costmap_topic'], OccupancyGrid)
+    odom_sub_node = ListenerBase('odom_subscriber', params['odom_topic'], Odometry)
+    costmap_sub_node = ListenerBase('costmap_sub', params['costmap_topic'], OccupancyGrid)
     gazebo_interface_node = GazeboInterface()
 
     sub_executor = rclpy.executors.MultiThreadedExecutor()
@@ -187,6 +282,13 @@ def main():
     sub_executor_thread.start()
     time.sleep(0.5)  # wait for nodes to start
 
+    gazebo_interface_node.set_entity_state(
+        'turtlebot3_waffle', start_pose.pose, None)
+    nav.setInitialPose(start_pose)
+    nav.clearAllCostmaps()
+    time.sleep(0.5)
+
+    logger.info('Running controllers through plans...')
     controller_results: List[ControllerResult] = []
     for i, plan in global_plans.items():
         marker_server_node.publish_path(plan)
@@ -194,6 +296,9 @@ def main():
         for controller in params['controllers']:
             for j in range(params['controller_runs']):
                 gazebo_interface_node.reset_world()
+                gazebo_interface_node.set_entity_state(
+                    'turtlebot3_waffle', start_pose.pose, None)
+
                 nav.clearLocalCostmap()
                 time.sleep(0.5)
 
@@ -206,7 +311,7 @@ def main():
                 while not nav.isTaskComplete():
                     time_ = rclpy.clock.Clock().now().seconds_nanoseconds()
                     # logger.info(f'Measuring at: {time_}')
-                    time.sleep(0.1)
+                    time.sleep(1)
                 end_time = rclpy.clock.Clock().now()
 
                 nav_result = False

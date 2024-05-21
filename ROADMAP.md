@@ -40,12 +40,23 @@
     - found that fdfdm eats a lot of memory -> one object (global)
   - calculate_metrics with ProcessPoolExecutor paralellized
 
-## 2024. 05. 21.
+## 2024. 05. 20.
 - nav2 doesnot work with rosddep -> change to apt install
   - mppi critics cannot be forwarded to print out
 - removed noise from turtlebot model sdf for 100% odometry
 - added obstacles and mapcreator
   - added map change to runtest
+
+## 2024. 05. 21.
+- added custom start goal generator (optimize it to prefer 0, 0)
+- better polar coordinate random goal generator
+- mppi stil not working eh
+- added world with plugin so entity set state service can be called
+
+
+végső kukoc ahol vizualizálja (annak stampjével) rádurni a critikeket újból és azokat publisholni
+https://github.com/turtlewizard73/navigation2/blob/a5fd16c0aea84a4dbeccec15bec37f1d35a3b332/nav2_mppi_controller/src/controller.cpp#L109
+
 
 TODO: outlier filtering for points, and interpolate the filtered values
 

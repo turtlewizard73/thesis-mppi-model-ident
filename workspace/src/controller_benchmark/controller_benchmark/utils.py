@@ -146,8 +146,8 @@ class MarkerServer(Node):
             marker.scale.x = 0.5
             marker.scale.y = 0.1
             marker.scale.z = 0.1
-            marker.color.r = 0.0
-            marker.color.g = 1.0
+            marker.color.r = 0.0 if namespace == 'goals' else 1.0
+            marker.color.g = 1.0 if namespace == 'goals' else 0.0
             marker.color.b = 0.0
             marker.color.a = 1.0
             marker_array.markers.append(marker)
@@ -231,11 +231,11 @@ class GazeboInterface(Node):
         req.name = name
         return self.make_client_async_call(self.get_entity_client, req)
 
-    def set_entity_state(self, name, pose, twist):
+    def set_entity_state(self, name, pose, twist=None):
         req = SetEntityState.Request()
         req.state.name = name
         req.state.pose = pose
-        req.state.twist = twist
+        req.state.twist = twist if twist is not None else Twist()
         return self.make_client_async_call(self.set_entity_client, req)
 
     def make_client_async_call(self, client, req):

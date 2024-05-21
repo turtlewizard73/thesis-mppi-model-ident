@@ -157,6 +157,7 @@ controller_server:
       gamma: 0.015
       motion_model: "DiffDrive"
       visualize: false
+      publish_critics: true
       TrajectoryVisualizer:
         trajectory_step: 5
         time_step: 3

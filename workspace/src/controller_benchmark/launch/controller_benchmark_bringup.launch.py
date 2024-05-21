@@ -30,7 +30,7 @@ def generate_launch_description():
     nav_config = os.path.join(this_package_dir, 'nav2_mppi_test.yaml')
 
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
-    world = ''  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
+    world = os.path.join(this_package_dir, 'empty_world.world')  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
 
     urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
     with open(urdf, 'r') as urdf_file:

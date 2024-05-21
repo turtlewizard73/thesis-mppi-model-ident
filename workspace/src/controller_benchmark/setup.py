@@ -12,6 +12,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name, glob('launch/*')),
         ('share/' + package_name, glob('config/*')),
+        ('share/' + package_name, glob('worlds/*')),
         ('share/' + package_name, glob('maps/*')),
         ('share/' + package_name, glob('models/*')),
         ('lib/' + package_name,
