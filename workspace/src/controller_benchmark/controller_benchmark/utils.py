@@ -127,7 +127,7 @@ class MarkerServer(Node):
         self.path_publisher = self.create_publisher(
             Path, '/plan', 10)
 
-    def publish_markers(self, poses: PoseStamped):
+    def publish_markers(self, poses: List[PoseStamped], namespace: str = 'goals'):
         """
         Publishes markers based on the given poses.
 
@@ -137,11 +137,11 @@ class MarkerServer(Node):
         marker_array = MarkerArray()
         for i, pose in enumerate(poses):
             marker = Marker()
+            marker.ns = namespace
             marker.header.frame_id = pose.header.frame_id
             marker.id = i
             marker.type = Marker.ARROW
             marker.action = Marker.ADD
-            # TODO: no orientation
             marker.pose = pose.pose
             marker.scale.x = 0.5
             marker.scale.y = 0.1

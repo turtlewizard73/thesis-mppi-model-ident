@@ -50,6 +50,44 @@ def spin_executor(executor):
         pass
 
 
+def get_random_free_pose(
+        global_costmap: np.ndarray,
+        resolution: float,
+        robot_width: float,
+        robot_length: float) -> PoseStamped:
+    x_buffer = int(robot_width / 2 / resolution)
+    y_buffer = int(robot_length / 2 / resolution)
+
+    max_retry = 100
+    for i in range(max_retry):
+        goal_x = randint(x_buffer, int(global_costmap.shape[1] / 2 - x_buffer))
+        sign_x = getrandbits(1)
+        goal_x = goal_x if sign_x == 0 else -goal_x
+
+        goal_y = randint(y_buffer, int(global_costmap.shape[0] / 2 - y_buffer))
+        sign_y = getrandbits(1)
+        goal_y = goal_y if sign_y == 0 else -goal_y
+
+        # check if footprint is free
+        roi = global_costmap[
+            goal_y - y_buffer:goal_y + y_buffer,
+            goal_x - x_buffer:goal_x + x_buffer]
+        if np.average(roi) != 0:
+            break
+
+    yaw = uniform(0, 1) * 2 * np.pi
+    q = Rotation.from_euler('XYZ', [0., 0., yaw], degrees=False).as_quat()
+
+    pose = PoseStamped()
+    pose.header.frame_id = 'map'
+    pose.pose.position.x = goal_x * resolution
+    pose.pose.position.y = goal_y * resolution
+    pose.pose.orientation.x = q[0]
+    pose.pose.orientation.y = q[1]
+    pose.pose.orientation.z = q[2]
+    pose.pose.orientation.w = q[3]
+
+
 def generate_random_goals(
         number_of_goals: int,
         min_distance: float,
@@ -95,15 +133,6 @@ def generate_random_goals(
 
         logger.info(f'Randomized goal: {goal_x}, {goal_y}, {yaw/np.pi*180}˚')
 
-        # check if goal is on global costmap
-        if global_costmap.shape[0] <= goal_y or \
-                global_costmap.shape[1] <= goal_x:
-            continue
-
-        # check if robot can reach goal (if not free skip)
-        if global_costmap[goal_y, goal_x] != 0:
-            continue
-
         # check if footprint is free
         roi = global_costmap[goal_y - y_buffer:goal_y +
                              y_buffer, goal_x - x_buffer:goal_x + x_buffer]
@@ -145,17 +174,11 @@ def main():
 
     param_interface = ParamInterface()
     controller_plugins = param_interface.get_param(
-        server_name='controller_server',
-        param_name='controller_plugins')
+        server_name='controller_server', param_name='controller_plugins')
     assert set(params['controllers']).issubset(controller_plugins), \
         f'Present controllers: {controller_plugins}'
 
-    marker_server_node = MarkerServer()
-    vis_executor = rclpy.executors.MultiThreadedExecutor()
-    vis_executor.add_node(marker_server_node)
-    vis_executor_thread = Thread(target=vis_executor.spin, daemon=True)
-    vis_executor_thread.start()
-
+    logger.info('Changing map...')
     nav.changeMap(os.path.join(this_package_dir, params['map_file']))
     nav.clearAllCostmaps()
     time.sleep(2)
@@ -164,7 +187,6 @@ def main():
     # size_x: Number of cells in the horizontal direction
     # size_y: Number of cells in the vertical direction
     global_costmap_msg = nav.getGlobalCostmap()
-    resolution = global_costmap_msg.metadata.resolution
     global_costmap = np.asarray(global_costmap_msg.data)
     global_costmap.resize(
         global_costmap_msg.metadata.size_y, global_costmap_msg.metadata.size_x)
@@ -172,39 +194,56 @@ def main():
     logger.info(
         f'Global costmap size: {global_costmap.shape}, resolution: {resolution}')
 
-    # Generate random goals
-    logger.info('Generating goals...')
-    start, goals = generate_random_goals(
-        number_of_goals=params['number_of_goals'],
-        min_distance=params['min_distance'],
-        global_costmap=global_costmap,
-        resolution=resolution,
-        robot_width=params['robot_width'],
-        robot_length=params['robot_length'])
-    marker_server_node.publish_markers(goals)
-    nav.setInitialPose(start)
-    # logger.info(f'Generated goals, from {number_of_generation} tries: {goals}')
+    logger.info('Starting marker server...')
+    marker_server_node = MarkerServer()
+    vis_executor = rclpy.executors.MultiThreadedExecutor()
+    vis_executor.add_node(marker_server_node)
+    vis_executor_thread = Thread(target=vis_executor.spin, daemon=True)
+    vis_executor_thread.start()
 
-    # Generating global plans
-    logger.info('Generating global plans...')
-    planner = params['planner']
+    # Generate random start
+    logger.info('Generating starting pose...')
+    start_pose = get_random_free_pose(
+        global_costmap, resolution, params['robot_width'], params['robot_length'])
+    marker_server_node.publish_markers([start_pose], 'start')
+
+    # Generate random goals and plans
+    logger.info('Generating goals and plans...')
+    random_goals = []
     global_plans: Dict[int, Path] = {}
+
     number_of_generation = 0
-    while len(global_plans) < params['number_of_goals']:
+    while len(random_goals) < params['number_of_goals']:
         number_of_generation += 1
-        goal = goals[len(global_plans)]
+        if number_of_generation > 100 * params['number_of_goals']:
+            logger.error('Cannot find enough goals')
+            break
 
-        if number_of_generation > 10 * params['number_of_goals']:
-            logger.error(f'Cannot generate global plan for goal: {goal}')
+        goal_pose = get_random_free_pose(
+            global_costmap, resolution, params['robot_width'], params['robot_length'])
 
-        nav.clearGlobalCostmap()
-        global_plan = nav.getPath(start, goal, planner, use_start=True)
-        if global_plan is None:
+        # check if min distance is kept
+        distance = np.sqrt(
+            (goal_pose.pose.position.x - start_pose.pose.position.x) ** 2 +
+            (goal_pose.pose.position.y - start_pose.pose.position.y) ** 2)
+        if distance < params['min_distance']:
             continue
 
-        global_plans[len(global_plans)] = global_plan
+        nav.clearGlobalCostmap()
+        time.sleep(0.5)
 
-    # logger.info(f'Generated global plans, from {number_of_generation}')
+        global_plan = nav.getPath(start_pose, goal_pose, params['planner'], use_start=True)
+        if global_plan is None:
+            logger.error(f'Cannot generate global plan for goal: {goal_pose}')
+            continue
+
+        random_goals.append(goal_pose)
+        global_plans[len(random_goals) - 1] = global_plan
+
+    logger.info(f'Generated global plans, from {number_of_generation}')
+    marker_server_node.publish_markers(random_goals)
+
+    nav.setInitialPose(start_pose)
 
     # Start navigation for each plan
     logger.info('Running controllers through plans...')
