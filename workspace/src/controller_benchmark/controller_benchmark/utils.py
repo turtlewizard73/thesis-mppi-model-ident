@@ -3,7 +3,7 @@
 # Common modules
 import os
 from dataclasses import dataclass
-from typing import List, Any, Type
+from typing import List, Any, Type, Tuple
 import numpy as np
 
 # ROS related modules
@@ -127,7 +127,11 @@ class MarkerServer(Node):
         self.path_publisher = self.create_publisher(
             Path, '/plan', 10)
 
-    def publish_markers(self, poses: List[PoseStamped], namespace: str = 'goals'):
+    def publish_markers(
+            self,
+            poses: List[PoseStamped],
+            namespace: str = 'goals',
+            rgb: Tuple[float, float, float] = (0.0, 1.0, 0.0)):
         """
         Publishes markers based on the given poses.
 
@@ -146,13 +150,24 @@ class MarkerServer(Node):
             marker.scale.x = 0.5
             marker.scale.y = 0.1
             marker.scale.z = 0.1
-            marker.color.r = 0.0 if namespace == 'goals' else 1.0
-            marker.color.g = 1.0 if namespace == 'goals' else 0.0
-            marker.color.b = 0.0
+            marker.color.r = rgb[0]
+            marker.color.g = rgb[1]
+            marker.color.b = rgb[2]
             marker.color.a = 1.0
             marker_array.markers.append(marker)
 
         self.marker_publisher.publish(marker_array)
+
+    def publish_generated_goals(self, x: np.ndarray, y: np.ndarray):
+        poses: List[PoseStamped] = []
+        for i in range(len(x)):
+            pose = PoseStamped()
+            pose.header.frame_id = 'map'
+            pose.pose.position.x = x[i]
+            pose.pose.position.y = y[i]
+            poses.append(pose)
+
+        self.publish_markers(poses, namespace='generated_goals', rgb=(0.0, 0.0, 1.0))
 
     def publish_path(self, path: Path):
         """

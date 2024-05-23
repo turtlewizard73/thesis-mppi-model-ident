@@ -46,6 +46,7 @@ logger = rclpy.logging.get_logger('controller_benchmark')
 
 logger.info(f'{params}')
 
+marker_server_node: MarkerServer = None
 
 def spin_executor(executor):
     try:
@@ -143,24 +144,38 @@ def get_random_free_pose_polar(
         resolution: float,
         start_pose: PoseStamped = None,
         min_distance: float = None) -> PoseStamped:
+    global marker_server_node
 
-    radius = 0.0 if min_distance is None else min_distance
-    points_to_generate = int(radius * 4) if radius > params['robot_radius'] else 2
+    max_distance = resolution * (
+        global_costmap.shape[0] + global_costmap.shape[1]) / 2 - params['robot_radius']
+
+    if min_distance is not None:
+        if min_distance > max_distance:
+            logger.error('Min distance is larger than max distance')
+            return None
+
+        min_radius = min_distance
+        points_to_generate = int(min_radius * 10)
+    else:
+        min_radius = 0.0
+        points_to_generate = 1
 
     start_x = 0.0 if start_pose is None else start_pose.pose.position.x
     start_y = 0.0 if start_pose is None else start_pose.pose.position.y
 
-    MAX_RETRY = 100
+    MAX_RETRY = 1000
     retries = 0
     while True:
+        print(f'point to generate: {points_to_generate}')
+        print(f'min_radius: {min_radius}')
         retries += 1
         if retries > MAX_RETRY:
             logger.error('Cannot find free pose')
             return None
 
         angles = np.random.rand(points_to_generate) * 2 * np.pi
-        # TODO: make radius random from min_distance to costmap size - robot_radius
-        # if radies becomes bigger then costmap size maybe?
+        radius = np.random.rand(points_to_generate) * params['robot_radius'] + min_radius
+
         x = radius * np.cos(angles) + start_x
         y = radius * np.sin(angles) + start_y
 
@@ -172,10 +187,15 @@ def get_random_free_pose_polar(
             yaw = angles[index]
             break
 
-        radius += params['robot_radius'] / 2
-        # TODO: maximalize radius in costmap size - robot_radius
+        if min_radius + 2 * params['robot_radius'] < max_distance:
+            min_radius += params['robot_radius']
 
-        points_to_generate = int(radius * 4)
+        if points_to_generate < 1000:
+            points_to_generate = int(min_radius * 10)
+
+        marker_server_node.publish_generated_goals(x, y)
+
+    logger.info(f'Generated pose at: {x}, {y}, {yaw}, from {retries} retries')
 
     pose = PoseStamped()
     pose.header.frame_id = 'map'
@@ -190,6 +210,7 @@ def get_random_free_pose_polar(
 
 
 def main():
+    global marker_server_node
     logger.info('Controller benchmark started')
     rclpy.init()
 
