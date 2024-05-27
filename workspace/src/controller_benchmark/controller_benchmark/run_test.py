@@ -17,12 +17,13 @@ from ament_index_python.packages import get_package_share_directory
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
 # ROS message types
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Path, Odometry, OccupancyGrid
+from nav2_mppi_controller.msg import CriticScores
 
 from utils import (
     ControllerResult, MarkerServer, ParamInterface,
-    CmdVelListener, ListenerBase, GazeboInterface)
+    ListenerBase, GazeboInterface)
 
 
 this_package_dir = get_package_share_directory('controller_benchmark')
@@ -47,6 +48,7 @@ logger = rclpy.logging.get_logger('controller_benchmark')
 logger.info(f'{params}')
 
 marker_server_node: MarkerServer = None
+
 
 def spin_executor(executor):
     try:
@@ -288,9 +290,15 @@ def main():
     marker_server_node.publish_markers(random_goals)
 
     logger.info('Preparing navigation...')
-    cmd_vel_sub_node = CmdVelListener()
-    odom_sub_node = ListenerBase('odom_subscriber', params['odom_topic'], Odometry)
-    costmap_sub_node = ListenerBase('costmap_sub', params['costmap_topic'], OccupancyGrid)
+    cmd_vel_sub_node = ListenerBase(
+        'cmd_vel_subscriber', params['cmd_vel_topic'], Twist)
+    odom_sub_node = ListenerBase(
+        'odom_subscriber', params['odom_topic'], Odometry)
+    costmap_sub_node = ListenerBase(
+        'costmap_sub', params['costmap_topic'], OccupancyGrid)
+    mppi_critics_sub_node = ListenerBase(
+        'mppi_critics_sub', params['mppi_critic_topic'], CriticScores)
+
     gazebo_interface_node = GazeboInterface()
 
     sub_executor = rclpy.executors.MultiThreadedExecutor()
@@ -298,6 +306,7 @@ def main():
     sub_executor.add_node(odom_sub_node)
     sub_executor.add_node(costmap_sub_node)
     sub_executor.add_node(gazebo_interface_node)
+    sub_executor.add_node(mppi_critics_sub_node)
     sub_executor_thread = Thread(
         target=spin_executor, args=(sub_executor, ), daemon=True)
     sub_executor_thread.start()
@@ -353,7 +362,8 @@ def main():
                     result=nav_result,
                     odom=odom_sub_node.get_msgs(start_time, end_time),
                     cmd_vel=cmd_vel_sub_node.get_msgs(start_time, end_time),
-                    costmaps=costmap_sub_node.get_msgs(start_time, end_time)
+                    costmaps=costmap_sub_node.get_msgs(start_time, end_time),
+                    critic_scores=mppi_critics_sub_node.get_msgs(start_time, end_time)
                 ))
                 gazebo_interface_node.reset_world()
             logger.info(f'{controller} finished plan: {i}')
@@ -373,6 +383,7 @@ def main():
     cmd_vel_sub_node.destroy_node()
     odom_sub_node.destroy_node()
     costmap_sub_node.destroy_node()
+    mppi_critics_sub_node.destroy_node()
     gazebo_interface_node.destroy_node()
 
     vis_executor.shutdown()

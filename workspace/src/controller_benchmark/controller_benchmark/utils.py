@@ -3,7 +3,7 @@
 # Common modules
 import os
 from dataclasses import dataclass
-from typing import List, Any, Type, Tuple
+from typing import List, Any, Type, Tuple, Dict
 import numpy as np
 
 # ROS related modules
@@ -13,13 +13,14 @@ from rclpy.time import Time
 from rclpy.parameter import parameter_value_to_python
 
 # ROS message types
+from std_msgs.msg import Header
 from std_srvs.srv import Empty
 from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
 from nav_msgs.msg import Path, OccupancyGrid, Odometry
 from visualization_msgs.msg import MarkerArray, Marker
 from gazebo_msgs.srv import SetEntityState, GetEntityState
-from rcl_interfaces.msg import Parameter, ParameterValue
 from rcl_interfaces.srv import GetParameters, SetParameters
+from nav2_mppi_controller.msg import CriticScores
 
 
 # benchmark
@@ -40,6 +41,7 @@ class ControllerResult:
     odom: List[Odometry]  # TODO: rename to odom
     cmd_vel: List[TwistStamped]  # TODO: rename to cmd_vel
     costmaps: List[OccupancyGrid]
+    critic_scores: List[CriticScores]
 
 
 @dataclass
@@ -72,8 +74,12 @@ class ControllerMetric:
     route_poses: np.ndarray
 
     time_steps: List[float]
+    linear_acc: List[float]
     linear_jerks: List[float]
+    angular_acc: List[float]
     angular_jerks: List[float]
+
+    critic_scores: Dict[str, List[float]]
 
 
 def measure_resource_usage(func):
@@ -183,18 +189,40 @@ class ListenerBase(Node):
     def __init__(self, node_name: str, topic_name: str, msg_type: Type):
         super().__init__(node_name)
         self.msgs = []
+        self.msg_type = msg_type
+        self.topic_name = topic_name
+
+        if hasattr(msg_type, 'header'):
+            callback = self.callback
+        elif msg_type == Twist:
+            callback = self.callback_twist
+            self.msg_type = TwistStamped
+        else:
+            callback = self.callback_headerless
+
         self.subscription = self.create_subscription(
             msg_type,
-            topic_name,
-            self.callback,
+            self.topic_name,
+            callback,
             10)
         self.get_logger().info(f'{node_name} initialized')
 
     def callback(self, msg):
         # Rewrite stamp from msg generation time to capture time
-        if hasattr(msg, 'header'):
-            msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.stamp = self.get_clock().now().to_msg()
         self.msgs.append(msg)
+
+    def callback_twist(self, msg):
+        stamped_msg = TwistStamped()
+        stamped_msg.header.stamp = self.get_clock().now().to_msg()
+        stamped_msg.twist = msg
+        self.msgs.append(stamped_msg)
+
+    def callback_headerless(self, msg):
+        # create stamp
+        header = Header()
+        header.stamp = self.get_clock().now().to_msg()
+        self.msgs.append((header, msg))
 
     def get_msgs(self, start_time: Time, end_time: Time):
         self.get_logger().info(f'Received msgs: {len(self.msgs)}')
@@ -203,28 +231,22 @@ class ListenerBase(Node):
         end = end_time.nanoseconds
         filtered_msgs = []
         for msg in self.msgs:
-            msg_time = Time.from_msg(msg.header.stamp).nanoseconds
+            if hasattr(self.msg_type, 'header'):
+                msg_time = Time.from_msg(msg.header.stamp).nanoseconds
+            else:
+                msg_time = Time.from_msg(msg[0].stamp).nanoseconds
+                msg = msg[1]
+
             if start <= msg_time <= end:
                 filtered_msgs.append(msg)
-        error_msg = f'No msgs found within the time range: {start} - {end}'
-        assert len(filtered_msgs) > 0, error_msg
+
+        if len(filtered_msgs) == 0:
+            self.get_logger().warn(
+                f'No msgs found within the time range: {start} - {end}')
+            return None
 
         self.msgs = []
         return filtered_msgs
-
-
-class CmdVelListener(ListenerBase):
-    def __init__(self):
-        super().__init__(
-            node_name='cmd_vel_subscriber',
-            topic_name='/cmd_vel',
-            msg_type=Twist)
-
-    def callback(self, msg):
-        msg_stamped = TwistStamped()
-        msg_stamped.header.stamp = self.get_clock().now().to_msg()
-        msg_stamped.twist = msg
-        self.msgs.append(msg_stamped)
 
 
 class GazeboInterface(Node):

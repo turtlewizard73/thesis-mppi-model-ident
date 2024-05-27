@@ -9,5 +9,7 @@ robot_length:  0.2  # along the x-axis of the robot [m]
 robot_width: 0.2  # along the y-axis [m]
 planner: 'GridBased'
 controllers: ['FollowPath', 'Maneuver']
+cmd_vel_topic: '/cmd_vel'
 odom_topic: '/odom'
 costmap_topic: '/local_costmap/costmap'
+mppi_critic_topic: '/mppi_critic_scores'

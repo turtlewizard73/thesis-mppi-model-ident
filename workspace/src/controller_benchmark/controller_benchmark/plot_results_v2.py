@@ -112,6 +112,16 @@ def calculate_metrics(result: ControllerResult) -> ControllerMetric:
     frechet_dist = calc_frechet_distance(plan, route)
     print(f"frechet dist for {result.controller_name} is {frechet_dist}")
 
+    if result.critic_scores is not None:
+        critic_scores_: Dict[str, List[float]] = {}
+        for cs in result.critic_scores:
+            for name, score in zip(cs.critic_names, cs.critic_scores):
+                if name.data not in critic_scores_:
+                    critic_scores_[name.data] = []
+                critic_scores_[name.data].append(score.data)
+    else:
+        critic_scores_ = None
+
     metric = ControllerMetric(
         controller_name=result.controller_name,
         plan_idx=result.plan_idx,
@@ -131,8 +141,11 @@ def calculate_metrics(result: ControllerResult) -> ControllerMetric:
         plan_poses=plan,
         route_poses=route,
         time_steps=dt,
+        linear_acc=acc_lin,
         linear_jerks=jerk_lin,
-        angular_jerks=jerk_ang
+        angular_acc=acc_ang,
+        angular_jerks=jerk_ang,
+        critic_scores=critic_scores_,
     )
     return metric
 
@@ -169,7 +182,7 @@ def main():
                 logger.error(f'Error processing {result.controller_name}: {e}')
 
     logger.info('Creating plots')
-    fig, (ax_plan, ax_jerk_x, ax_jerk_theta) = plt.subplots(1, 3, sharey=False)
+    fig, ((ax_plan, ax_jerk_x), (ax_critics, ax_jerk_theta)) = plt.subplots(ncols=2, nrows=2, sharey=False, sharex=False)
     fig.suptitle('Controller metrics')
 
     ax_plan.set_title('Plan vs Route')
@@ -187,13 +200,25 @@ def main():
     ax_jerk_theta.set_xlabel('Time [s]')
     ax_jerk_theta.set_ylabel('Jerk [rad/s^3]')
 
+    ax_critics.set_title('Critic scores')
+    ax_critics.set_xlabel('Time [s]')
+    ax_critics.set_ylabel('Score')
+
     for metric in controller_metrics:
         label = f'{metric.controller_name} - frechet: {metric.frechet_dist:.2f} [m]'
         ax_plan.plot(metric.route_poses[:, 0], metric.route_poses[:, 1], label=label)
-        ax_jerk_x.plot(metric.time_steps, metric.linear_jerks, label=metric.controller_name)
+        ax_jerk_x.plot(metric.time_steps, metric.linear_jerks, label=f"{metric.controller_name} lin jerk")
         ax_jerk_x.scatter(metric.time_steps[-1], metric.linear_jerks[-1], marker='x', color='red', zorder=2)
-        ax_jerk_theta.plot(metric.time_steps, metric.angular_jerks, label=metric.controller_name)
+        ax_jerk_x.plot(metric.time_steps, metric.linear_acc, label=f"{metric.controller_name} lin acc")
+
+        ax_jerk_theta.plot(metric.time_steps, metric.angular_jerks, label=f"{metric.controller_name} ang jerk")
         ax_jerk_theta.scatter(metric.time_steps[-1], metric.angular_jerks[-1], marker='x', color='red', zorder=2)
+        ax_jerk_theta.plot(metric.time_steps, metric.angular_acc, label=f"{metric.controller_name} ang acc")
+
+        if metric.critic_scores is not None and metric.controller_name == "Maneuver":
+            score_times = np.linspace(0, metric.time, len(next(iter(metric.critic_scores.values()))))
+            for name, scores in metric.critic_scores.items():
+                ax_critics.plot(score_times, scores, label=f"{metric.controller_name} {name}")
 
     ax_plan.grid(visible=True, which='both', axis='both')
     ax_plan.legend()
@@ -203,6 +228,9 @@ def main():
 
     ax_jerk_theta.grid(visible=True, which='both', axis='both')
     ax_jerk_theta.legend()
+
+    ax_critics.grid(visible=True, which='both', axis='both')
+    ax_critics.legend()
 
     # separating metrics by controller
     single_controller_metrics: Dict[str, List[ControllerMetric]] = {}

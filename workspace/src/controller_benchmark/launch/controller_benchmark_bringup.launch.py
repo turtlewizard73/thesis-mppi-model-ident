@@ -99,6 +99,7 @@ def generate_launch_description():
             package='nav2_controller',
             executable='controller_server',
             name='controller_server',
+            # prefix=['gdb -ex=r --args'],
             output='screen',
             parameters=[nav_config,
                         {'use_sim_time': True},
@@ -142,6 +143,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(gazebo_dir, 'launch', 'gzclient.launch.py')),
+            launch_arguments={'verbose': 'true'}.items(),
             condition=IfCondition(gui)),
 
         Node(
@@ -161,6 +163,8 @@ def generate_launch_description():
             arguments=[
                 '-entity', robot_name,
                 '-file', robot_sdf,
+                # '-topic', 'robot_description',
+                '-timeout', '60',
                 '-robot_namespace', '',
                 '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
                 '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']])
