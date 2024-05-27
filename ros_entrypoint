@@ -34,9 +34,8 @@ fi
 # aliases
 alias g='git status'
 alias gf='git fetch'
-alias rosbuild="
-    cd ~/thesis-mppi-model-ident/workspace &&
-    colcon build --symlink-install --cmake-args ' -DCMAKE_EXPORT_COMPILE_COMMANDS=ON'"
+alias rosbuild="cd ~/thesis-mppi-model-ident/workspace &&
+    colcon build --symlink-install --cmake-args ' -DCMAKE_EXPORT_COMPILE_COMMANDS=ON' '-DCMAKE_BUILD_TYPE=Debug' --packages-select controller_benchmark nav2_mppi_controller"
 
 
 # Execute the command passed into this entrypoint

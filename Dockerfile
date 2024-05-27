@@ -109,6 +109,9 @@ RUN \
     --mount=type=cache,target=/root/.cache/pip,mode=0777,sharing=locked \
     pip3 install -r dependencies-pip_dev.txt
 
+# Overwrite default flake8 config, since it is not working properly
+COPY ament_flake8.ini /opt/ros/humble/lib/python3.10/site-packages/ament_flake8/configuration/ament_flake8.ini
+
 # # build the workspace
 # WORKDIR /home/${USERNAME}/thesis-mppi-model-ident/workspace
 # # Check if "nav2_humble_cache" folder contains "build" and "install" folders
@@ -130,6 +133,9 @@ SHELL ["/bin/bash", "-c"]
 # Set the ownership of the overlay workspace to the new user
 COPY ros_entrypoint /home/${USERNAME}/ros_entrypoint
 RUN chmod +x /home/${USERNAME}/ros_entrypoint
+
+ARG MAKEFLAGS
+ENV MAKEFLAGS "$MAKEFLAGS"
 
 # RUN chown -R ${UID}:${GID} /home/${USERNAME}
 
