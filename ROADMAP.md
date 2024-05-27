@@ -53,6 +53,14 @@
 - mppi stil not working eh
 - added world with plugin so entity set state service can be called
 
+## 2024. 05. 27.
+- mppi critic publisher with plotting (big stuff)
+- finalized randomg polar generation
+- made derivative benchmarking (összehasonlítás és van saját newton3/8-as)
+  - jobb mert kisebb az outlier érték, de lecheckolni a végén miért nagy
+  - ugyanitt vektorosítani hogy szép legyen
+  - TODO: de lehet nem lehet vektorosítani mert dt ugye nem uniform
+
 
 végső kukoc ahol vizualizálja (annak stampjével) rádurni a critikeket újból és azokat publisholni
 https://github.com/turtlewizard73/navigation2/blob/a5fd16c0aea84a4dbeccec15bec37f1d35a3b332/nav2_mppi_controller/src/controller.cpp#L109
@@ -62,9 +70,9 @@ TODO: outlier filtering for points, and interpolate the filtered values
 
 ## TODOs - 2024. 04. 10.
 - make gazebo gui headless? - done
-- IMPORT WHYY NOT WORKING??? - working
+- IMPORT WHYY NOT WORKING??? - working - somehow solved
 - finish run_test.py
-  - parametrize
+  - parametrize - done
   - think about number of retries
 - separate important configs to yaml file - done
   - those that importatnly needded for run_test.py
@@ -75,9 +83,3 @@ TODO: outlier filtering for points, and interpolate the filtered values
 - make run_test.py to be able to run on turtlebot
   - separate launch?
   - how to collect data?
-
-## Plans
-- study metrics.py make it better, simpler
-- rewise used metrics
-- run metrics with own params
-- change something in mppi controller to see the difference

@@ -77,6 +77,18 @@ def calc_frechet_distance(plan, route):
 #     s = d/mdev if mdev else np.zeros(len(d))
 #     return data[s < m]
 
+def newton_diff(y, dt):
+    derivative = np.zeros_like(y)
+    # Central differences
+    derivative[2:-2] = (-y[4:] + 8*y[3:-1] - 8*y[1:-3] + y[0:-4]) / (12 * dt)
+    # Use lower-order methods at the boundaries
+    derivative[0] = (y[1] - y[0]) / dt  # Forward difference for the first point
+    derivative[1] = (y[2] - y[0]) / (2 * dt)  # Central difference for the second point
+    derivative[-2] = (y[-1] - y[-3]) / (2 * dt)  # Central difference for the second last point
+    derivative[-1] = (y[-1] - y[-2]) / dt  # Backward difference for the last point
+    return derivative
+
+
 def reject_outliers(data, m=0.6745, axis=None):
     median = np.median(data, axis=axis)
     deviation = np.abs(data - median)
@@ -95,15 +107,17 @@ def calculate_metrics(result: ControllerResult) -> ControllerMetric:
     completion_ratio = (traversed_length - plan_length) / plan_length
 
     dt = np.array([Time.from_msg(t.header.stamp).nanoseconds * 1e-9 for t in result.cmd_vel])
-    dt -= dt[0]
+    dt_array = dt - dt[0]
+    dt = np.mean(np.diff(dt_array))  # TODO: make dt stay an array differences are big
+    #  0.05612588 0.0438931  0.0548203  0.04536557 0.05174136 0.05203557
     vel_lin = np.array([v.twist.linear.x for v in result.cmd_vel])
     vel_ang = np.array([v.twist.angular.z for v in result.cmd_vel])
 
-    acc_lin = np.gradient(vel_lin, dt)
-    jerk_lin = np.gradient(acc_lin, dt)
+    acc_lin = newton_diff(vel_lin, dt)
+    jerk_lin = newton_diff(acc_lin, dt)
 
-    acc_ang = np.gradient(vel_ang, dt)
-    jerk_ang = np.gradient(acc_ang, dt)
+    acc_ang = newton_diff(vel_ang, dt)
+    jerk_ang = newton_diff(acc_ang, dt)
 
     # fdfdm = FastDiscreteFrechetMatrix(euclidean_dist)
     plan = np.array([get_xy(p) for p in result.plan.poses])
@@ -140,7 +154,7 @@ def calculate_metrics(result: ControllerResult) -> ControllerMetric:
         ms_angular_jerk=np.sqrt(np.mean(jerk_ang**2)),
         plan_poses=plan,
         route_poses=route,
-        time_steps=dt,
+        time_steps=dt_array,
         linear_acc=acc_lin,
         linear_jerks=jerk_lin,
         angular_acc=acc_ang,

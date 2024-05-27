@@ -97,17 +97,6 @@ def get_random_free_pose(
     return pose
 
 
-def check_pose_free(x: float, y: float, costmap: np.ndarray, res: float) -> bool:
-    robot_radius = np.sqrt(
-        params['robot_width'] ** 2 + params['robot_length'] ** 2)
-
-    # check if footprint is free by using turn radius
-    roi = costmap[
-        int((y - robot_radius) / res):int((y + robot_radius) / res),
-        int((x - robot_radius) / res):int((x + robot_radius) / res)]
-    return np.average(roi) == 0
-
-
 def check_poses_free(
         x: np.ndarray, y: np.ndarray, costmap: np.ndarray, res: float) -> np.ndarray:
     turning_radius = params['robot_radius']
@@ -151,25 +140,32 @@ def get_random_free_pose_polar(
     max_distance = resolution * (
         global_costmap.shape[0] + global_costmap.shape[1]) / 2 - params['robot_radius']
 
-    if min_distance is not None:
-        if min_distance > max_distance:
-            logger.error('Min distance is larger than max distance')
-            return None
-
-        min_radius = min_distance
-        points_to_generate = int(min_radius * 10)
-    else:
+    if min_distance is None:
         min_radius = 0.0
         points_to_generate = 1
+    elif min_distance > max_distance:
+        min_radius = max_distance - params['robot_radius']
+    else:
+        min_radius = min_distance
 
-    start_x = 0.0 if start_pose is None else start_pose.pose.position.x
-    start_y = 0.0 if start_pose is None else start_pose.pose.position.y
+    points_to_generate = int(min_radius * 10)
+
+    origin_free = check_poses_free(
+        np.array([0.0]), np.array([0.0]), global_costmap, resolution)
+    if start_pose is None and origin_free:
+        start_pose = PoseStamped()
+        start_pose.header.frame_id = 'map'
+        start_pose.pose.position.x = 0.0
+        start_pose.pose.position.y = 0.0
+        start_pose.pose.orientation.w = 1.0
+        return start_pose
+    else:
+        start_x = start_pose.pose.position.x
+        start_y = start_pose.pose.position.y
 
     MAX_RETRY = 1000
     retries = 0
     while True:
-        print(f'point to generate: {points_to_generate}')
-        print(f'min_radius: {min_radius}')
         retries += 1
         if retries > MAX_RETRY:
             logger.error('Cannot find free pose')
@@ -268,13 +264,6 @@ def main():
         goal_pose = get_random_free_pose_polar(
             global_costmap, resolution, start_pose, params['min_distance'])
 
-        # check if min distance is kept
-        # distance = np.sqrt(
-        #     (goal_pose.pose.position.x - start_pose.pose.position.x) ** 2 +
-        #     (goal_pose.pose.position.y - start_pose.pose.position.y) ** 2)
-        # if distance < params['min_distance']:
-        #     continue
-
         nav.clearGlobalCostmap()
         time.sleep(0.5)
 
@@ -298,7 +287,6 @@ def main():
         'costmap_sub', params['costmap_topic'], OccupancyGrid)
     mppi_critics_sub_node = ListenerBase(
         'mppi_critics_sub', params['mppi_critic_topic'], CriticScores)
-
     gazebo_interface_node = GazeboInterface()
 
     sub_executor = rclpy.executors.MultiThreadedExecutor()
