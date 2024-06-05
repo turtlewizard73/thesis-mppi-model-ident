@@ -11,6 +11,7 @@ from typing import List, Type, Dict
 import pickle
 import yaml
 import cv2
+import logging
 
 # ROS related modules
 import rclpy
@@ -38,8 +39,7 @@ params['map_yaml'] = os.path.join(
 params['map'] = yaml.safe_load(open(params['map_yaml']))
 
 # save the image path
-params['map_file'] = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), 'maps', params['map']['image'])
+params['map_file'] = params['map_yaml'].replace('.yaml', '.png')
 
 # make directory for results
 params['output_dir'] = os.path.join(
@@ -49,7 +49,19 @@ params['controller_runs'] = \
     1 if params['number_of_goals'] == 1 else params['controller_runs']
 params['robot_radius'] = np.sqrt(params['robot_width'] ** 2 + params['robot_length'] ** 2)
 
-logger = rclpy.logging.get_logger('controller_benchmark')
+# logger = rclpy.logging.get_logger('controller_benchmark')
+# logging.basicConfig()
+logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger('controller_benchmark')
+# logger.setLevel(logging.INFO)
+
+logger.debug("this will get printed")
+logger.info("this will get printed")
+logger.warning("this will get printed")
+logger.error("this will get printed")
+logger.critical("this will get printed")
+
 
 logger.info(f'{params}')
 
@@ -193,18 +205,9 @@ def main():
     nav.clearAllCostmaps()
     time.sleep(2)
 
-    # Get global costmap for goal generation
-    # size_x: Number of cells in the horizontal direction
-    # size_y: Number of cells in the vertical direction
-    global_costmap_msg = nav.getGlobalCostmap()
-    global_costmap = np.asarray(global_costmap_msg.data)
-    global_costmap.resize(
-        global_costmap_msg.metadata.size_y, global_costmap_msg.metadata.size_x)
-    logger.info(f'Global costmap size: {global_costmap.shape}')
-
-    # read map image
+    # read map image for goal generation
     map_img = cv2.imread(params['map_file'], cv2.IMREAD_GRAYSCALE)
-    logger.info(f'Map size: {map_img.shape}')
+    logger.info(f"Read: {params['map_file']},")
 
     logger.info('Starting marker server...')
     marker_server_node = MarkerServer()
@@ -289,7 +292,6 @@ def main():
                 nav.clearLocalCostmap()
                 time.sleep(0.5)
 
-                nav.clearLocalCostmap()
                 start_time = rclpy.clock.Clock().now()
                 nav.followPath(plan, controller_id=controller)
                 logger.info(

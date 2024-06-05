@@ -33,9 +33,8 @@ from time import time as python_time
 @dataclass
 class ControllerResult:
     controller_name: str
-    plan_idx: int
+
     plan: Path  # contains starting position?
-    run: int
     start_time: float  # nanoseconds
     end_time: float  # nanoseconds
     result: bool
@@ -43,6 +42,8 @@ class ControllerResult:
     cmd_vel: List[TwistStamped]  # TODO: rename to cmd_vel
     costmaps: List[OccupancyGrid]
     critic_scores: List[CriticScores]
+    plan_idx: int = 0
+    run: int = 0
 
 
 @dataclass

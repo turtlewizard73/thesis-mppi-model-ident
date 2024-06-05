@@ -196,7 +196,8 @@ def main():
                 logger.error(f'Error processing {result.controller_name}: {e}')
 
     logger.info('Creating plots')
-    fig, ((ax_plan, ax_jerk_x), (ax_critics, ax_jerk_theta)) = plt.subplots(ncols=2, nrows=2, sharey=False, sharex=False)
+    fig, ((ax_plan, ax_jerk_x), (ax_critics, ax_jerk_theta)) = plt.subplots(
+        ncols=2, nrows=2, sharey=False, sharex=False)
     fig.suptitle('Controller metrics')
 
     ax_plan.set_title('Plan vs Route')

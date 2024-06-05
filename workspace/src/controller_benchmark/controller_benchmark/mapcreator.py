@@ -21,9 +21,18 @@ class MapCreator:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
 
-    def generate_blank_square_png(self) -> np.ndarray:
+    def generate_blank_square(self) -> np.ndarray:
         num_pixels = int(self.size / self.resolution)
         image = np.ones((num_pixels, num_pixels, 3), dtype=np.uint8) * 255
+        return image
+
+    def generate_blank_rectangle(self, size_x: float, size_y: float) -> np.ndarray:
+        if size_x is None or size_y is None:
+            size_x = size_y = self.size
+
+        num_pixels_x = int(size_x / self.resolution)
+        num_pixels_y = int(size_y / self.resolution)
+        image = np.ones((num_pixels_x, num_pixels_y, 3), dtype=np.uint8) * 255
         return image
 
     def add_obstacles(self, image: np.ndarray) -> np.ndarray:
@@ -64,7 +73,7 @@ class MapCreator:
     def create_map(self, obstacles: bool = False, output_filename: str = None) -> str:
         stamp = time.strftime(self.timestamp_format)
         output_filename = output_filename or f'map_{int(self.size)}_{stamp}.png'
-        new_map = self.generate_blank_square_png()
+        new_map = self.generate_blank_square()
 
         if obstacles is True:
             new_map = self.add_obstacles(new_map)
@@ -108,5 +117,14 @@ def main():
         map_creator.create_map(obstacles=args.obstacles, output_filename=f'{mapname}_{i}.png')
 
 
+def main_rectangle():
+    map_creator = MapCreator(resolution=0.05, size=10, robot_radius=0.2)
+
+    rectangle = map_creator.generate_blank_rectangle(3., 10.)
+    output_filename = 'map_rectangle.png'
+    cv2.imwrite(
+        os.path.join(map_creator.output_dir, output_filename), rectangle)
+
+
 if __name__ == '__main__':
-    main()
+    main_rectangle()

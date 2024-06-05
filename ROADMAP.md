@@ -39,6 +39,8 @@
   - maketh benchmark decorator
     - found that fdfdm eats a lot of memory -> one object (global)
   - calculate_metrics with ProcessPoolExecutor paralellized
+    - better than threading: separate memory
+    - https://stackoverflow.com/questions/3044580/multiprocessing-vs-threading-python
 
 ## 2024. 05. 20.
 - nav2 doesnot work with rosddep -> change to apt install
@@ -65,7 +67,10 @@
 végső kukoc ahol vizualizálja (annak stampjével) rádurni a critikeket újból és azokat publisholni
 https://github.com/turtlewizard73/navigation2/blob/a5fd16c0aea84a4dbeccec15bec37f1d35a3b332/nav2_mppi_controller/src/controller.cpp#L109
 
-
+## 2024. 06. 05.
+- created new controllerbenchmark class
+  - takes maps and runs the controller benchmark
+  - custom maps with gimp
 TODO: outlier filtering for points, and interpolate the filtered values
 
 ## TODOs - 2024. 04. 10.
