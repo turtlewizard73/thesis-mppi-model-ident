@@ -5,6 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import List, Any, Type, Tuple, Dict
 import numpy as np
+from scipy.spatial.transform import Rotation
 
 # ROS related modules
 import rclpy
@@ -164,13 +165,18 @@ class MarkerServer(Node):
 
         self.marker_publisher.publish(marker_array)
 
-    def publish_generated_goals(self, x: np.ndarray, y: np.ndarray):
+    def publish_generated_goals(self, x: np.ndarray, y: np.ndarray, yaws: np.ndarray):
         poses: List[PoseStamped] = []
         for i in range(len(x)):
             pose = PoseStamped()
             pose.header.frame_id = 'map'
             pose.pose.position.x = x[i]
             pose.pose.position.y = y[i]
+            q = Rotation.from_euler('XYZ', [0., 0., yaws[i]], degrees=False).as_quat()
+            pose.pose.orientation.x = q[0]
+            pose.pose.orientation.y = q[1]
+            pose.pose.orientation.z = q[2]
+            pose.pose.orientation.w = q[3]
             poses.append(pose)
 
         self.publish_markers(poses, namespace='generated_goals', rgb=(0.0, 0.0, 1.0))

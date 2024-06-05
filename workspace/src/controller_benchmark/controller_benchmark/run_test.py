@@ -10,6 +10,7 @@ from scipy.spatial.transform import Rotation
 from typing import List, Type, Dict
 import pickle
 import yaml
+import cv2
 
 # ROS related modules
 import rclpy
@@ -27,17 +28,22 @@ from utils import (
 
 
 this_package_dir = get_package_share_directory('controller_benchmark')
-# TODO: make config file importable before
+# import config file to params
 config_file = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), 'config', 'run_test_config.yaml')
 params = yaml.safe_load(open(config_file))
-map_file = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), 'maps', params['map_file'])
-params['map'] = yaml.safe_load(open(map_file))
+# import map yaml into params
+params['map_yaml'] = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'maps', params['map_yaml'])
+params['map'] = yaml.safe_load(open(params['map_yaml']))
+
+# save the image path
+params['map_file'] = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'maps', params['map']['image'])
 
 # make directory for results
 params['output_dir'] = os.path.join(
-    os.path.dirname(__file__), params['output_dir'])
+    os.path.dirname(os.path.dirname(__file__)), params['output_dir'])
 os.makedirs(params['output_dir'], exist_ok=True)
 params['controller_runs'] = \
     1 if params['number_of_goals'] == 1 else params['controller_runs']
@@ -55,46 +61,6 @@ def spin_executor(executor):
         executor.spin()
     except rclpy.executors.ExternalShutdownException:
         pass
-
-
-def get_random_free_pose(
-        global_costmap: np.ndarray,
-        resolution: float,
-        robot_width: float,
-        robot_length: float) -> PoseStamped:
-    x_buffer = int(robot_width / 2 / resolution)
-    y_buffer = int(robot_length / 2 / resolution)
-
-    max_retry = 100
-    for i in range(max_retry):
-        goal_x = randint(x_buffer, int(global_costmap.shape[1] / 2 - x_buffer))
-        sign_x = getrandbits(1)
-        goal_x = goal_x if sign_x == 0 else -goal_x
-
-        goal_y = randint(y_buffer, int(global_costmap.shape[0] / 2 - y_buffer))
-        sign_y = getrandbits(1)
-        goal_y = goal_y if sign_y == 0 else -goal_y
-
-        # check if footprint is free
-        roi = global_costmap[
-            goal_y - y_buffer:goal_y + y_buffer,
-            goal_x - x_buffer:goal_x + x_buffer]
-        if np.average(roi) != 0:
-            break
-
-    yaw = uniform(0, 1) * 2 * np.pi
-    q = Rotation.from_euler('XYZ', [0., 0., yaw], degrees=False).as_quat()
-
-    pose = PoseStamped()
-    pose.header.frame_id = 'map'
-    pose.pose.position.x = goal_x * resolution
-    pose.pose.position.y = goal_y * resolution
-    pose.pose.orientation.x = q[0]
-    pose.pose.orientation.y = q[1]
-    pose.pose.orientation.z = q[2]
-    pose.pose.orientation.w = q[3]
-
-    return pose
 
 
 def check_poses_free(
@@ -131,37 +97,39 @@ def check_poses_free(
 
 
 def get_random_free_pose_polar(
-        global_costmap: np.ndarray,
-        resolution: float,
+        map: np.ndarray,
         start_pose: PoseStamped = None,
         min_distance: float = None) -> PoseStamped:
     global marker_server_node
+    res = params['map']['resolution']
 
-    max_distance = resolution * (
-        global_costmap.shape[0] + global_costmap.shape[1]) / 2 - params['robot_radius']
-
-    if min_distance is None:
-        min_radius = 0.0
-        points_to_generate = 1
-    elif min_distance > max_distance:
-        min_radius = max_distance - params['robot_radius']
-    else:
-        min_radius = min_distance
-
-    points_to_generate = int(min_radius * 10)
-
-    origin_free = check_poses_free(
-        np.array([0.0]), np.array([0.0]), global_costmap, resolution)
-    if start_pose is None and origin_free:
+    origin_free = check_poses_free(np.array([0.0]), np.array([0.0]), map, res)
+    if origin_free is True:
         start_pose = PoseStamped()
         start_pose.header.frame_id = 'map'
         start_pose.pose.position.x = 0.0
         start_pose.pose.position.y = 0.0
         start_pose.pose.orientation.w = 1.0
         return start_pose
+
+    if start_pose is None:
+        start_x = 0
+        start_y = 0
     else:
         start_x = start_pose.pose.position.x
         start_y = start_pose.pose.position.y
+
+    max_distance = res * np.mean(map.shape) - params['robot_radius']
+
+    if min_distance is None:
+        min_radius = 0.0
+        points_to_generate = 10
+    elif min_distance > max_distance:
+        min_radius = max_distance - params['robot_radius']
+    else:
+        min_radius = min_distance
+
+    points_to_generate = int(min_radius * 10)
 
     MAX_RETRY = 1000
     retries = 0
@@ -176,8 +144,9 @@ def get_random_free_pose_polar(
 
         x = radius * np.cos(angles) + start_x
         y = radius * np.sin(angles) + start_y
+        marker_server_node.publish_generated_goals(x, y, angles)
 
-        free = check_poses_free(x, y, global_costmap, resolution)
+        free = check_poses_free(x, y, map, res)
         if np.any(free):
             index = np.argmax(free)
             x = x[index]
@@ -190,8 +159,6 @@ def get_random_free_pose_polar(
 
         if points_to_generate < 1000:
             points_to_generate = int(min_radius * 10)
-
-        marker_server_node.publish_generated_goals(x, y)
 
     logger.info(f'Generated pose at: {x}, {y}, {yaw}, from {retries} retries')
 
@@ -222,7 +189,7 @@ def main():
         f'Present controllers: {controller_plugins}'
 
     logger.info('Changing map...')
-    nav.changeMap(os.path.join(this_package_dir, params['map_file']))
+    nav.changeMap(params['map_yaml'])
     nav.clearAllCostmaps()
     time.sleep(2)
 
@@ -233,9 +200,11 @@ def main():
     global_costmap = np.asarray(global_costmap_msg.data)
     global_costmap.resize(
         global_costmap_msg.metadata.size_y, global_costmap_msg.metadata.size_x)
-    resolution = global_costmap_msg.metadata.resolution
-    logger.info(
-        f'Global costmap size: {global_costmap.shape}, resolution: {resolution}')
+    logger.info(f'Global costmap size: {global_costmap.shape}')
+
+    # read map image
+    map_img = cv2.imread(params['map_file'], cv2.IMREAD_GRAYSCALE)
+    logger.info(f'Map size: {map_img.shape}')
 
     logger.info('Starting marker server...')
     marker_server_node = MarkerServer()
@@ -246,7 +215,7 @@ def main():
 
     # Generate random start
     logger.info('Generating starting pose...')
-    start_pose = get_random_free_pose_polar(global_costmap, resolution)
+    start_pose = get_random_free_pose_polar(map_img)
     marker_server_node.publish_markers([start_pose], 'start')
 
     # Generate random goals and plans
@@ -262,7 +231,7 @@ def main():
             break
 
         goal_pose = get_random_free_pose_polar(
-            global_costmap, resolution, start_pose, params['min_distance'])
+            map_img, start_pose, params['min_distance'])
 
         nav.clearGlobalCostmap()
         time.sleep(0.5)
