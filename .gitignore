@@ -1,5 +1,6 @@
 workspace/build
 workspace/install
+workspace/src/controller_benchmark/maps_generated/*
 workspace/log
 build
 install

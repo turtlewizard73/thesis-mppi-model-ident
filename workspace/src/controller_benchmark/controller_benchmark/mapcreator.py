@@ -1,6 +1,9 @@
 import numpy as np
 import cv2
 import time
+import os
+import argparse
+import yaml
 
 
 class MapCreator:
@@ -13,6 +16,10 @@ class MapCreator:
         self.robot_radius = robot_radius
         self.size = size
         self.timestamp_format = timestamp_format
+        self.output_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), 'maps_generated')
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
 
     def generate_blank_square_png(self) -> np.ndarray:
         num_pixels = int(self.size / self.resolution)
@@ -54,21 +61,52 @@ class MapCreator:
 
         return image
 
-    def create_map(self, obstacles: bool = False, output_filename: str = None) -> None:
+    def create_map(self, obstacles: bool = False, output_filename: str = None) -> str:
         stamp = time.strftime(self.timestamp_format)
-        output_filename = output_filename or f"blank_square_{int(self.size)}_{stamp}.png"
+        output_filename = output_filename or f'map_{int(self.size)}_{stamp}.png'
         new_map = self.generate_blank_square_png()
 
         if obstacles is True:
             new_map = self.add_obstacles(new_map)
 
-        cv2.imwrite(output_filename, new_map)
+        cv2.imwrite(os.path.join(self.output_dir, output_filename), new_map)
+
+        map_data = {
+            'image': output_filename,
+            'resolution': self.resolution,
+            'origin': [-self.size/2, -self.size/2, 0.0],
+            'negate': 0,
+            'occupied_thresh': 0.65,
+            'free_thresh': 0.196
+        }
+        yaml_filename = output_filename.replace('.png', '.yaml')
+        with open(os.path.join(self.output_dir, yaml_filename), 'w') as file:
+            yaml.dump(map_data, file)
 
         return output_filename
 
-# Example usage
-resolution = 0.05  # 1 m per cell
-size = 5  # 1 meter
-map_creator = MapCreator(resolution=resolution, size=size, robot_radius=0.2)
-for i in range(10):
-    map_creator.create_map(obstacles=True, output_filename=f'map_{i}.png')
+
+def main():
+    parser = argparse.ArgumentParser(description='Map Creator')
+    parser.add_argument(
+        '-r', '--resolution', type=float, default=0.05, help='Resolution in meters per cell')
+    parser.add_argument(
+        '-s', '--size', type=int, default=5, help='Size of the map in meters')
+    parser.add_argument(
+        '-n', '--num_maps', type=int, default=1, help='Number of maps to generate')
+    parser.add_argument(
+        '-o', '--obstacles', default=False, action='store_true', help='Add obstacles to the map')
+    args = parser.parse_args()
+
+    map_creator = MapCreator(resolution=args.resolution, size=args.size, robot_radius=0.2)
+
+    mapname = f'map_{args.size}'
+    if args.obstacles is False:
+        mapname = f'{mapname}_empty'
+
+    for i in range(args.num_maps):
+        map_creator.create_map(obstacles=args.obstacles, output_filename=f'{mapname}_{i}.png')
+
+
+if __name__ == '__main__':
+    main()
