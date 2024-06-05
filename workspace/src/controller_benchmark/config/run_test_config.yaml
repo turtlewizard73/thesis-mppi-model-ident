@@ -1,0 +1,15 @@
+output_dir: 'results'
+timestamp_format: '%Y-%m-%d-%H-%M'
+# map_file: '10by10_empty.yaml'
+map_file: '5by5_empty.yaml'
+controller_runs: 1  # defaults to 1 if number of goals is >1
+number_of_goals: 1
+min_distance: 1.5  # [m]
+robot_length:  0.2  # along the x-axis of the robot [m]
+robot_width: 0.2  # along the y-axis [m]
+planner: 'GridBased'
+controllers: ['FollowPath', 'Maneuver']
+cmd_vel_topic: '/cmd_vel'
+odom_topic: '/odom'
+costmap_topic: '/local_costmap/costmap'
+mppi_critic_topic: '/mppi_critic_scores'

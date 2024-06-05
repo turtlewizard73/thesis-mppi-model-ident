@@ -1,9 +1,12 @@
 # Builtin modules
 import os
+from distutils.util import strtobool
 
 # ROS modules
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, IncludeLaunchDescription
+from launch.actions import (
+    IncludeLaunchDescription, DeclareLaunchArgument)  # ExecuteProcess
+from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
@@ -17,14 +20,17 @@ def generate_launch_description():
     this_package_dir = get_package_share_directory('controller_benchmark')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
 
-    use_basic_config = False
-    use_gui = True
+    # nav_config_file = LaunchConfiguration('use_basic_config')
+    # use_basic_config = bool(strtobool(use_basic_config))
+    gui = LaunchConfiguration('gui')
 
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
-    nav_config = os.path.join(this_package_dir, 'nav2_params_mppi.yaml') if \
-        use_basic_config is False else os.path.join(this_package_dir, 'nav2_params.yaml')
+
+    # nav_config_file = 'nav2_params_mppi.yaml' if use_basic_config is False else 'nav2_params.yaml'
+    nav_config = os.path.join(this_package_dir, 'nav2_mppi_test.yaml')
+
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
-    world = ''  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
+    world = os.path.join(this_package_dir, 'empty_world.world')  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
 
     urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
     with open(urdf, 'r') as urdf_file:
@@ -48,11 +54,21 @@ def generate_launch_description():
     # -------------------------------------------------------------------------------------
 
     robot_name = 'turtlebot3_waffle'
-    robot_sdf = os.path.join(nav2_bringup_dir, 'worlds', 'waffle.model')
+    robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
     pose = {'x': '0.0', 'y': '0.0', 'z': '0.0',
             'R': '0.0', 'P': '0.0', 'Y': '0.0'}
 
     return LaunchDescription([
+        # DeclareLaunchArgument(
+        #     'config', default_value='nav2_params_mppi.yaml',
+        #     description='Whether to use default nav2 configuration.'
+        # ),
+
+        DeclareLaunchArgument(
+            'gui', default_value='True',
+            description='Whether to run gazebo headless.'
+        ),
+
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -83,6 +99,7 @@ def generate_launch_description():
             package='nav2_controller',
             executable='controller_server',
             name='controller_server',
+            # prefix=['gdb -ex=r --args'],
             output='screen',
             parameters=[nav_config,
                         {'use_sim_time': True},
@@ -126,7 +143,8 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(gazebo_dir, 'launch', 'gzclient.launch.py')),
-            condition=IfCondition(str(use_gui))),
+            launch_arguments={'verbose': 'true'}.items(),
+            condition=IfCondition(gui)),
 
         Node(
             package='robot_state_publisher',
@@ -145,6 +163,8 @@ def generate_launch_description():
             arguments=[
                 '-entity', robot_name,
                 '-file', robot_sdf,
+                # '-topic', 'robot_description',
+                '-timeout', '60',
                 '-robot_namespace', '',
                 '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
                 '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']])

@@ -77,3 +77,23 @@ Performance test (communication - dds)
 - install ros2: https://docs.ros.org/en/humble/How-To-Guides/Installing-on-Raspberry-Pi.html
 - multi platform build:https://stackoverflow.com/questions/59756123/use-buildx-build-linux-arm64-in-docker-compose-file
 - https://docs.docker.com/compose/compose-file/05-services/#platform
+
+### MPPI
+- maci at roscon: https://vimeo.com/showcase/10775523/video/879001391
+- pdf roscon: https://roscon.ros.org/2023/talks/On_Use_of_Nav2_MPPI_Controller.pdf
+
+### Frechet distance
+- https://courses.cs.duke.edu/spring07/cps296.2/scribe_notes/lecture23.pdf
+- discrete: http://www.kr.tuwien.ac.at/staff/eiter/et-archive/cdtr9464.pdf
+- repo: https://github.com/joaofig/discrete-frechet/blob/master/distances/discrete.py
+- easy stackoverflow: https://stackoverflow.com/questions/39374514/fr%C3%A9chet-distance-of-2-trajectories
+
+
+
+
+
+
+
+### pdf
+- some tool for planner banchmarking: https://arxiv.org/pdf/2105.01777
+- rms jerk: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3470860/

@@ -9,163 +9,45 @@ from random import randint, getrandbits, uniform
 from scipy.spatial.transform import Rotation
 from typing import List, Type, Dict
 import pickle
+import yaml
 
-# Ros related modules
+# ROS related modules
 import rclpy
-from rclpy.time import Time
-from rclpy.node import Node
 from ament_index_python.packages import get_package_share_directory
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 
-# Ros message types
-from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
-from visualization_msgs.msg import MarkerArray, Marker
+# ROS message types
+from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Path, Odometry, OccupancyGrid
-from std_srvs.srv import Empty
-from gazebo_msgs.srv import SetEntityState, GetEntityState
+from nav2_mppi_controller.msg import CriticScores
 
-from controller_benchmark.utils import ControllerResult
+from utils import (
+    ControllerResult, MarkerServer, ParamInterface,
+    ListenerBase, GazeboInterface)
 
 
 this_package_dir = get_package_share_directory('controller_benchmark')
-map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
+# TODO: make config file importable before
+config_file = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'config', 'run_test_config.yaml')
+params = yaml.safe_load(open(config_file))
+map_file = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 'maps', params['map_file'])
+params['map'] = yaml.safe_load(open(map_file))
+
+# make directory for results
+params['output_dir'] = os.path.join(
+    os.path.dirname(__file__), params['output_dir'])
+os.makedirs(params['output_dir'], exist_ok=True)
+params['controller_runs'] = \
+    1 if params['number_of_goals'] == 1 else params['controller_runs']
+params['robot_radius'] = np.sqrt(params['robot_width'] ** 2 + params['robot_length'] ** 2)
+
 logger = rclpy.logging.get_logger('controller_benchmark')
 
+logger.info(f'{params}')
 
-class MarkerServer(Node):
-    """
-    This class represents a marker server that publishes markers and paths.
-
-    Args:
-        Node (_type_): The base class for creating a ROS node.
-    """
-
-    def __init__(self):
-        super().__init__('marker_server')
-        self.marker_publisher = self.create_publisher(
-            MarkerArray, 'waypoints', 10)
-        self.path_publisher = self.create_publisher(
-            Path, '/plan', 10)
-
-    def publish_markers(self, poses: PoseStamped):
-        """
-        Publishes markers based on the given poses.
-
-        Args:
-            poses (PoseStamped): The list of poses to create markers from.
-        """
-        marker_array = MarkerArray()
-        for i, pose in enumerate(poses):
-            marker = Marker()
-            marker.header.frame_id = pose.header.frame_id
-            marker.id = i
-            marker.type = Marker.ARROW
-            marker.action = Marker.ADD
-            # TODO: no orientation
-            marker.pose = pose.pose
-            marker.scale.x = 0.5
-            marker.scale.y = 0.1
-            marker.scale.z = 0.1
-            marker.color.r = 0.0
-            marker.color.g = 1.0
-            marker.color.b = 0.0
-            marker.color.a = 1.0
-            marker_array.markers.append(marker)
-
-        self.marker_publisher.publish(marker_array)
-
-    def publish_path(self, path: Path):
-        """
-        Publishes path.
-
-        Args:
-            path (Path): Path to publish.
-        """
-        self.path_publisher.publish(path)
-
-
-class ListenerBase(Node):
-    def __init__(self, node_name: str, topic_name: str, msg_type: Type):
-        super().__init__(node_name)
-        self.msgs = []
-        self.subscription = self.create_subscription(
-            msg_type,
-            topic_name,
-            self.callback,
-            10)
-        self.get_logger().info(f'{node_name} initialized')
-
-    def callback(self, msg):
-        # Rewrite stamp from msg generation time to capture time
-        if hasattr(msg, 'header'):
-            msg.header.stamp = self.get_clock().now().to_msg()
-        self.msgs.append(msg)
-
-    def get_msgs(self, start_time: Time, end_time: Time):
-        self.get_logger().info(f'Received msgs: {len(self.msgs)}')
-
-        start = start_time.nanoseconds
-        end = end_time.nanoseconds
-        filtered_msgs = []
-        for msg in self.msgs:
-            msg_time = Time.from_msg(msg.header.stamp).nanoseconds
-            if start <= msg_time <= end:
-                filtered_msgs.append(msg)
-        error_msg = f'No msgs found within the time range: {start} - {end}'
-        assert len(filtered_msgs) > 0, error_msg
-
-        self.msgs = []
-        return filtered_msgs
-
-
-class CmdVelListener(ListenerBase):
-    def __init__(self):
-        super().__init__(
-            node_name='cmd_vel_subscriber',
-            topic_name='/cmd_vel',
-            msg_type=Twist)
-
-    def callback(self, msg):
-        msg_stamped = TwistStamped()
-        msg_stamped.header.stamp = self.get_clock().now().to_msg()
-        msg_stamped.twist = msg
-        self.msgs.append(msg_stamped)
-
-
-class GazeboInterface(Node):
-    def __init__(self):
-        super().__init__('gazebo_interface')
-        self.reset_world_client = self.create_client(Empty, 'reset_world')
-        self.set_entity_client = self.create_client(
-            SetEntityState, 'set_entity_state')
-        self.get_entity_client = self.create_client(
-            GetEntityState, 'get_entity_state')
-        self.get_logger().info('Gazebo interface initialized')
-
-    def reset_world(self):
-        req = Empty.Request()
-        return self.make_client_async_call(self.reset_world_client, req)
-
-    def get_entity_state(self, name):
-        req = GetEntityState.Request()
-        req.name = name
-        return self.make_client_async_call(self.get_entity_client, req)
-
-    def set_entity_state(self, name, pose, twist):
-        req = SetEntityState.Request()
-        req.state.name = name
-        req.state.pose = pose
-        req.state.twist = twist
-        return self.make_client_async_call(self.set_entity_client, req)
-
-    def make_client_async_call(self, client, req):
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(
-                f'service {client.srv_name} not available, waiting again...')
-
-        future = client.call_async(req)
-        rclpy.spin_until_future_complete(self, future)
-        return future.result()
+marker_server_node: MarkerServer = None
 
 
 def spin_executor(executor):
@@ -175,21 +57,174 @@ def spin_executor(executor):
         pass
 
 
+def get_random_free_pose(
+        global_costmap: np.ndarray,
+        resolution: float,
+        robot_width: float,
+        robot_length: float) -> PoseStamped:
+    x_buffer = int(robot_width / 2 / resolution)
+    y_buffer = int(robot_length / 2 / resolution)
+
+    max_retry = 100
+    for i in range(max_retry):
+        goal_x = randint(x_buffer, int(global_costmap.shape[1] / 2 - x_buffer))
+        sign_x = getrandbits(1)
+        goal_x = goal_x if sign_x == 0 else -goal_x
+
+        goal_y = randint(y_buffer, int(global_costmap.shape[0] / 2 - y_buffer))
+        sign_y = getrandbits(1)
+        goal_y = goal_y if sign_y == 0 else -goal_y
+
+        # check if footprint is free
+        roi = global_costmap[
+            goal_y - y_buffer:goal_y + y_buffer,
+            goal_x - x_buffer:goal_x + x_buffer]
+        if np.average(roi) != 0:
+            break
+
+    yaw = uniform(0, 1) * 2 * np.pi
+    q = Rotation.from_euler('XYZ', [0., 0., yaw], degrees=False).as_quat()
+
+    pose = PoseStamped()
+    pose.header.frame_id = 'map'
+    pose.pose.position.x = goal_x * resolution
+    pose.pose.position.y = goal_y * resolution
+    pose.pose.orientation.x = q[0]
+    pose.pose.orientation.y = q[1]
+    pose.pose.orientation.z = q[2]
+    pose.pose.orientation.w = q[3]
+
+    return pose
+
+
+def check_poses_free(
+        x: np.ndarray, y: np.ndarray, costmap: np.ndarray, res: float) -> np.ndarray:
+    turning_radius = params['robot_radius']
+    # convert xy to costmap origin
+    x = x - params['map']['origin'][0]
+    y = y - params['map']['origin'][1]
+
+    # Calculate the bounding box coordinates for each (x, y) pair
+    x_min = ((x - turning_radius) / res).astype(int)
+    x_max = ((x + turning_radius) / res).astype(int)
+    y_min = ((y - turning_radius) / res).astype(int)
+    y_max = ((y + turning_radius) / res).astype(int)
+
+    # Get costmap dimensions
+    costmap_height, costmap_width = costmap.shape
+
+    # Check if the coordinates are within bounds of the costmap
+    within_bounds = (x_min > 0) & (x_max < costmap_width) & \
+        (y_min > 0) & (y_max < costmap_height)
+
+    # Initialize result array to False
+    results = np.zeros(x.shape, dtype=bool)
+
+    # Create a mask for coordinates that are within bounds
+    valid_indices = np.where(within_bounds)[0]
+
+    for i in valid_indices:
+        roi = costmap[y_min[i]:y_max[i], x_min[i]:x_max[i]]
+        results[i] = np.average(roi) == 0
+
+    return results
+
+
+def get_random_free_pose_polar(
+        global_costmap: np.ndarray,
+        resolution: float,
+        start_pose: PoseStamped = None,
+        min_distance: float = None) -> PoseStamped:
+    global marker_server_node
+
+    max_distance = resolution * (
+        global_costmap.shape[0] + global_costmap.shape[1]) / 2 - params['robot_radius']
+
+    if min_distance is None:
+        min_radius = 0.0
+        points_to_generate = 1
+    elif min_distance > max_distance:
+        min_radius = max_distance - params['robot_radius']
+    else:
+        min_radius = min_distance
+
+    points_to_generate = int(min_radius * 10)
+
+    origin_free = check_poses_free(
+        np.array([0.0]), np.array([0.0]), global_costmap, resolution)
+    if start_pose is None and origin_free:
+        start_pose = PoseStamped()
+        start_pose.header.frame_id = 'map'
+        start_pose.pose.position.x = 0.0
+        start_pose.pose.position.y = 0.0
+        start_pose.pose.orientation.w = 1.0
+        return start_pose
+    else:
+        start_x = start_pose.pose.position.x
+        start_y = start_pose.pose.position.y
+
+    MAX_RETRY = 1000
+    retries = 0
+    while True:
+        retries += 1
+        if retries > MAX_RETRY:
+            logger.error('Cannot find free pose')
+            return None
+
+        angles = np.random.rand(points_to_generate) * 2 * np.pi
+        radius = np.random.rand(points_to_generate) * params['robot_radius'] + min_radius
+
+        x = radius * np.cos(angles) + start_x
+        y = radius * np.sin(angles) + start_y
+
+        free = check_poses_free(x, y, global_costmap, resolution)
+        if np.any(free):
+            index = np.argmax(free)
+            x = x[index]
+            y = y[index]
+            yaw = angles[index]
+            break
+
+        if min_radius + 2 * params['robot_radius'] < max_distance:
+            min_radius += params['robot_radius']
+
+        if points_to_generate < 1000:
+            points_to_generate = int(min_radius * 10)
+
+        marker_server_node.publish_generated_goals(x, y)
+
+    logger.info(f'Generated pose at: {x}, {y}, {yaw}, from {retries} retries')
+
+    pose = PoseStamped()
+    pose.header.frame_id = 'map'
+    pose.pose.position.x = x
+    pose.pose.position.y = y
+    q = Rotation.from_euler('XYZ', [0., 0., yaw], degrees=False).as_quat()
+    pose.pose.orientation.x = q[0]
+    pose.pose.orientation.y = q[1]
+    pose.pose.orientation.z = q[2]
+    pose.pose.orientation.w = q[3]
+    return pose
+
+
 def main():
+    global marker_server_node
     logger.info('Controller benchmark started')
     rclpy.init()
 
     nav = BasicNavigator()
     nav.waitUntilNav2Active('planner_server', 'controller_server')
 
-    marker_server_node = MarkerServer()
-    vis_executor = rclpy.executors.MultiThreadedExecutor()
-    vis_executor.add_node(marker_server_node)
-    vis_executor_thread = Thread(target=vis_executor.spin, daemon=True)
-    vis_executor_thread.start()
+    param_interface = ParamInterface()
+    controller_plugins = param_interface.get_param(
+        server_name='controller_server', param_name='controller_plugins')
+    assert set(params['controllers']).issubset(controller_plugins), \
+        f'Present controllers: {controller_plugins}'
 
-    # nav.changeMap(map_file)
-    # time.sleep(2)
+    logger.info('Changing map...')
+    nav.changeMap(os.path.join(this_package_dir, params['map_file']))
+    nav.clearAllCostmaps()
+    time.sleep(2)
 
     # Get global costmap for goal generation
     # size_x: Number of cells in the horizontal direction
@@ -202,128 +237,56 @@ def main():
     logger.info(
         f'Global costmap size: {global_costmap.shape}, resolution: {resolution}')
 
-    # Generate random goals
-    logger.info('Generating goals...')
-    # goals needs to be on global costmap
-    # goals needs to be on free space
-    # robot footprint around goal should be free
-    # has to be at least min_distance away from starting point
-    number_of_goals = 2
-    goals = []
-    min_distance = 3.0  # [m]
-    robot_length = 0.2  # along the x-axis of the robot [m]
-    robot_width = 0.2  # along the y-axis [m]
+    logger.info('Starting marker server...')
+    marker_server_node = MarkerServer()
+    vis_executor = rclpy.executors.MultiThreadedExecutor()
+    vis_executor.add_node(marker_server_node)
+    vis_executor_thread = Thread(target=vis_executor.spin, daemon=True)
+    vis_executor_thread.start()
 
-    start = PoseStamped()
-    start.header.frame_id = 'map'
-    start.header.stamp = nav.get_clock().now().to_msg()
-    start.pose.position.x = 0.0
-    start.pose.position.y = 0.0
-    q = Rotation.from_euler(
-        'zyx', [0., 0., 0.], degrees=False).as_quat()
-    start.pose.orientation.w = q[0]
-    start.pose.orientation.x = q[1]
-    start.pose.orientation.y = q[2]
-    start.pose.orientation.z = q[3]
+    # Generate random start
+    logger.info('Generating starting pose...')
+    start_pose = get_random_free_pose_polar(global_costmap, resolution)
+    marker_server_node.publish_markers([start_pose], 'start')
+
+    # Generate random goals and plans
+    logger.info('Generating goals and plans...')
+    random_goals = []
+    global_plans: Dict[int, Path] = {}
 
     number_of_generation = 0
-    while len(goals) < number_of_goals:
+    while len(random_goals) < params['number_of_goals']:
         number_of_generation += 1
-
-        if number_of_generation > 100 * number_of_goals:
+        if number_of_generation > 1000 * params['number_of_goals']:
             logger.error('Cannot find enough goals')
             break
 
-        x_buffer = int(robot_width / 2 / resolution)
-        # d_buffer = int(min_distance / resolution)
-        # remove distance buffer from random gen because one axes is enough for distance
-        goal_x = randint(x_buffer, global_costmap.shape[1] / 2 - x_buffer)
-        sign_x = getrandbits(1)
-        goal_x = goal_x if sign_x == 0 else -goal_x
+        goal_pose = get_random_free_pose_polar(
+            global_costmap, resolution, start_pose, params['min_distance'])
 
-        y_buffer = int(robot_length / 2 / resolution)
-        goal_y = randint(y_buffer, global_costmap.shape[0] / 2 - y_buffer)
-        sign_y = getrandbits(1)
-        goal_y = goal_y if sign_y == 0 else -goal_y
+        nav.clearGlobalCostmap()
+        time.sleep(0.5)
 
-        yaw = uniform(0, 1) * 2 * np.pi
-
-        logger.info(f'Randomized goal: {goal_x}, {goal_y}, {yaw/np.pi*180}˚')
-
-        # check if goal is on global costmap
-        if global_costmap.shape[0] <= goal_y or global_costmap.shape[1] <= goal_x:
-            continue
-
-        # check if robot can reach goal
-        if global_costmap[goal_y, goal_x] != 0:
-            continue
-
-        # check if footprint is free
-        roi = global_costmap[goal_y - y_buffer:goal_y +
-                             y_buffer, goal_x - x_buffer:goal_x + x_buffer]
-        if np.average(roi) != 0:
-            continue
-
-        # check if min distance is kept
-        goal_x *= resolution
-        goal_y *= resolution
-        distance = np.sqrt((goal_x - start.pose.position.x) ** 2 +
-                           (goal_y - start.pose.position.y) ** 2)
-        if distance < min_distance:
-            continue
-
-        # make goal msg
-        goal = PoseStamped()
-        goal.header.frame_id = 'map'
-        goal.header.stamp = nav.get_clock().now().to_msg()
-        goal.pose.position.x = goal_x
-        goal.pose.position.y = goal_y
-
-        q = Rotation.from_euler(
-            'zyx', [yaw, 0., 0.], degrees=False).as_quat()
-        goal.pose.orientation.w = q[0]
-        goal.pose.orientation.x = q[1]
-        goal.pose.orientation.y = q[2]
-        goal.pose.orientation.z = q[3]
-
-        goals.append(goal)
-
-    marker_server_node.publish_markers(goals)
-    logger.info(f'Generated goals, from {number_of_generation} tries: {goals}')
-
-    # Generating global plans
-    logger.info('Generating global plans...')
-    planner = 'GridBased'
-    global_plans: Dict[int, Path] = {}
-    number_of_generation = 0
-    while len(global_plans) < number_of_goals:
-        number_of_generation += 1
-        goal = goals[len(global_plans)]
-
-        if number_of_generation > 10 * number_of_goals:
-            logger.error(f'Cannot generate global plan for goal: {goal}')
-
-        global_plan = nav.getPath(start, goal, planner, use_start=True)
+        global_plan = nav.getPath(start_pose, goal_pose, params['planner'], use_start=True)
         if global_plan is None:
+            logger.error(f'Cannot generate global plan for goal: {goal_pose}')
             continue
 
-        global_plans[len(global_plans)] = global_plan
+        random_goals.append(goal_pose)
+        global_plans[len(random_goals) - 1] = global_plan
 
     logger.info(f'Generated global plans, from {number_of_generation}')
+    marker_server_node.publish_markers(random_goals)
 
-    # Start navigation for each plan
-    # we need to collect:
-    # - poses
-    # - cmd_vel
-    # - costmap
-    logger.info('Running controllers through plans...')
-    controllers = ['MPPI_example', 'MPPI_Maneuver']
-
-    cmd_vel_sub_node = CmdVelListener()
+    logger.info('Preparing navigation...')
+    cmd_vel_sub_node = ListenerBase(
+        'cmd_vel_subscriber', params['cmd_vel_topic'], Twist)
     odom_sub_node = ListenerBase(
-        'odom_subscriber', '/odom', Odometry)
+        'odom_subscriber', params['odom_topic'], Odometry)
     costmap_sub_node = ListenerBase(
-        'costmap_subscriber', '/local_costmap/costmap', OccupancyGrid)
+        'costmap_sub', params['costmap_topic'], OccupancyGrid)
+    mppi_critics_sub_node = ListenerBase(
+        'mppi_critics_sub', params['mppi_critic_topic'], CriticScores)
     gazebo_interface_node = GazeboInterface()
 
     sub_executor = rclpy.executors.MultiThreadedExecutor()
@@ -331,67 +294,76 @@ def main():
     sub_executor.add_node(odom_sub_node)
     sub_executor.add_node(costmap_sub_node)
     sub_executor.add_node(gazebo_interface_node)
+    sub_executor.add_node(mppi_critics_sub_node)
     sub_executor_thread = Thread(
         target=spin_executor, args=(sub_executor, ), daemon=True)
     sub_executor_thread.start()
     time.sleep(0.5)  # wait for nodes to start
 
+    gazebo_interface_node.set_entity_state(
+        'turtlebot3_waffle', start_pose.pose, None)
+    nav.setInitialPose(start_pose)
+    nav.clearAllCostmaps()
+    time.sleep(0.5)
+
+    logger.info('Running controllers through plans...')
     controller_results: List[ControllerResult] = []
     for i, plan in global_plans.items():
         marker_server_node.publish_path(plan)
         logger.info(f'Starting plan: {i}')
-        for controller in controllers:
-            gazebo_interface_node.reset_world()
-            time.sleep(0.5)
+        for controller in params['controllers']:
+            for j in range(params['controller_runs']):
+                gazebo_interface_node.reset_world()
+                gazebo_interface_node.set_entity_state(
+                    'turtlebot3_waffle', start_pose.pose, None)
 
-            nav.clearLocalCostmap()
-            start_time = rclpy.clock.Clock().now()
-            nav.followPath(plan, controller_id=controller)
-            logger.info(
-                f'Starting controller: {controller}, '
-                f'started at time: {start_time.seconds_nanoseconds}')
-            while not nav.isTaskComplete():
-                time_ = rclpy.clock.Clock().now().seconds_nanoseconds()
-                # logger.info(f'Measuring at: {time_}')
-                time.sleep(0.1)
-            end_time = rclpy.clock.Clock().now()
+                nav.clearLocalCostmap()
+                time.sleep(0.5)
 
-            nav_result = False
-            if (nav.getResult() == TaskResult.SUCCEEDED):
-                nav_result = True
-            elif (nav.getResult() == TaskResult.FAILED):
-                nav_result = False
-            else:
+                nav.clearLocalCostmap()
+                start_time = rclpy.clock.Clock().now()
+                nav.followPath(plan, controller_id=controller)
                 logger.info(
-                    f'{controller} unexpected result: {nav.getResult()}')
+                    f'Starting controller: {controller}, '
+                    f'started at time: {start_time.seconds_nanoseconds}')
+                while not nav.isTaskComplete():
+                    time_ = rclpy.clock.Clock().now().seconds_nanoseconds()
+                    # logger.info(f'Measuring at: {time_}')
+                    time.sleep(1)
+                end_time = rclpy.clock.Clock().now()
+
                 nav_result = False
+                if (nav.getResult() == TaskResult.SUCCEEDED):
+                    nav_result = True
 
-            logger.info(
-                f'{controller} finished with result: {nav_result}, '
-                f'at: {end_time.seconds_nanoseconds},')
+                logger.info(
+                    f'{controller} finished with result: {nav_result}, '
+                    f'at: {end_time.seconds_nanoseconds},')
 
-            controller_results.append(ControllerResult(
-                plan_idx=i,
-                plan=plan,
-                controller_name=controller,
-                start_time=start_time.nanoseconds,
-                end_time=end_time.nanoseconds,
-                result=nav_result,
-                poses=odom_sub_node.get_msgs(start_time, end_time),
-                twists=cmd_vel_sub_node.get_msgs(start_time, end_time),
-                costmaps=costmap_sub_node.get_msgs(start_time, end_time)
-            ))
+                controller_results.append(ControllerResult(
+                    controller_name=controller,
+                    plan_idx=i,
+                    plan=plan,
+                    run=j,
+                    start_time=start_time.nanoseconds,
+                    end_time=end_time.nanoseconds,
+                    result=nav_result,
+                    odom=odom_sub_node.get_msgs(start_time, end_time),
+                    cmd_vel=cmd_vel_sub_node.get_msgs(start_time, end_time),
+                    costmaps=costmap_sub_node.get_msgs(start_time, end_time),
+                    critic_scores=mppi_critics_sub_node.get_msgs(start_time, end_time)
+                ))
+                gazebo_interface_node.reset_world()
             logger.info(f'{controller} finished plan: {i}')
-            gazebo_interface_node.reset_world()
-
     logger.info('Controllers finished')
 
     logger.info("Write Results...")
-    # stamp = time.strftime("%Y-%m-%d-%H-%M")
-    # filename = f'/controller_benchmark_results_{stamp}.pickle'
-    filename = '/controller_benchmark_results.pickle'
-    with open(os.getcwd() + filename, 'wb+') as f:
+    stamp = time.strftime(params['timestamp_format'])
+    filename = f'/controller_benchmark_results_{stamp}.pickle'
+    # filename = '/controller_benchmark_results.pickle'
+    with open(params['output_dir'] + filename, 'wb+') as f:
         pickle.dump(controller_results, f, pickle.HIGHEST_PROTOCOL)
+    logger.info(f'Written results to: {params["output_dir"] + filename}')
 
     logger.info('Controller benchmark finished')
 
@@ -399,6 +371,7 @@ def main():
     cmd_vel_sub_node.destroy_node()
     odom_sub_node.destroy_node()
     costmap_sub_node.destroy_node()
+    mppi_critics_sub_node.destroy_node()
     gazebo_interface_node.destroy_node()
 
     vis_executor.shutdown()

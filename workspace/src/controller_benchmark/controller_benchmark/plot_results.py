@@ -13,7 +13,7 @@ from tabulate import tabulate
 from rclpy import logging
 from rclpy.time import Time
 
-from controller_benchmark.utils import ControllerResult, ControllerMetric
+from utils import ControllerResult, ControllerMetric
 
 
 logger = logging.get_logger('controller_benchmark')
