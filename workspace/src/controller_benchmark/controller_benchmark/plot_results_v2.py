@@ -19,7 +19,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # ROS related modules
 from rclpy import logging
-from ament_index_python.packages import get_package_share_directory
 from rclpy.time import Time
 
 # ROS message types
@@ -29,13 +28,11 @@ from nav_msgs.msg import Odometry
 from discrete import FastDiscreteFrechetMatrix, euclidean as euclidean_dist
 from utils import ControllerResult, ControllerMetric, measure_resource_usage
 
-this_package_dir = get_package_share_directory('controller_benchmark')
 script_dir = os.path.dirname(__file__)
 
-map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
 config_file = os.path.join(os.path.dirname(script_dir), 'config', 'run_test_config.yaml')
 params = yaml.safe_load(open(config_file))
-params['output_dir'] = os.path.join(script_dir, params['output_dir'])
+params['output_dir'] = os.path.join(os.path.dirname(script_dir), params['output_dir'])
 
 logger = logging.get_logger('controller_benchmark')
 fdfm: FastDiscreteFrechetMatrix = None
@@ -172,7 +169,8 @@ def main():
     logger.info('Reading results from file')
 
     # Get the latest file in the directory
-    result_files = glob.glob(os.path.join(params['output_dir'] + '/*.pickle'))
+    result_files = glob.glob(os.path.join(
+        params['output_dir'], 'controller_benchmark_results*.pickle'))
     latest_file = max(result_files, key=os.path.getctime)
     logger.info(f'Using file: {latest_file}')
 
@@ -194,6 +192,8 @@ def main():
                     logger.info(f'{metric.controller_name} finished')
             except Exception as e:
                 logger.error(f'Error processing {result.controller_name}: {e}')
+
+    logger.info(f'len of controller_metrics: {len(controller_metrics)}')
 
     logger.info('Creating plots')
     fig, ((ax_plan, ax_jerk_x), (ax_critics, ax_jerk_theta)) = plt.subplots(

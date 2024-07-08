@@ -28,6 +28,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ~/.gitconfig:/home/turtlewizard/.gitconfig
       - ~/.ssh:/home/turtlewizard/.ssh
+      - /usr/share/gazebo-11/models:/usr/share/gazebo-11/models
     group_add:
       - plugdev
 

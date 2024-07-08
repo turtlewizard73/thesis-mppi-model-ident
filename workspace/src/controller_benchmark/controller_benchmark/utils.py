@@ -33,7 +33,6 @@ from time import time as python_time
 @dataclass
 class ControllerResult:
     controller_name: str
-
     plan: Path  # contains starting position?
     start_time: float  # nanoseconds
     end_time: float  # nanoseconds
@@ -283,9 +282,12 @@ class GazeboInterface(Node):
         return self.make_client_async_call(self.set_entity_client, req)
 
     def make_client_async_call(self, client, req):
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info(
-                f'service {client.srv_name} not available, waiting again...')
+        max_attempts = 6
+        for i in range(max_attempts):
+            if not client.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(
+                    f'service {client.srv_name} not available '
+                    f'[{i}/{max_attempts}], waiting again...')
 
         future = client.call_async(req)
         rclpy.spin_until_future_complete(self, future)

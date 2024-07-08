@@ -73,6 +73,28 @@ https://github.com/turtlewizard73/navigation2/blob/a5fd16c0aea84a4dbeccec15bec37
   - custom maps with gimp
 TODO: outlier filtering for points, and interpolate the filtered values
 
+
+
+## HOGYAN TOVÁBB? .exe
+- HANGOLÁS
+  - critikeket behangolni
+
+## 2024. 07. 08.
+- rendberakása a controller benchmarknak
+- https://docs.python.org/3/library/concurrent.futures.html#threadpoolexecutor-example
+- processpoolos dolog jobb lett:
+  - probléma self.func nem lehet self.method mert class nem pickleable https://stackoverflow.com/questions/44144584/typeerror-cant-pickle-thread-lock-objects
+  - szóval így lett staticmethod
+  - de még így is kihalt "Error processing 2: A process in the process pool was terminated abruptly while the future was running or pending.""
+  - szóval random for ciklus megoldja, valamiért kevesebb most a számolás mint régebben kellett WTF
+- plotol is "szépen"
+  - kövinek javítani a plotoláson a képet valahogy resizeolni (resolutionnel levenni i guess)
+- meg ugye a costot megnézni
+- és akkor konklúzió felvenni a turtlebot sebességét és megnézni, hogy hogyan megy -> ez a az alapprobléma hogy valszeg szarul
+  - itt kiválasztani három metrikát hogy miért szarul
+- megnézni hogy akkor costokkal mi van ilyenkor és akkor kiválasztani egyet amit megnézni hogy lehet javítani
+
+
 ## TODOs - 2024. 04. 10.
 - make gazebo gui headless? - done
 - IMPORT WHYY NOT WORKING??? - working - somehow solved
