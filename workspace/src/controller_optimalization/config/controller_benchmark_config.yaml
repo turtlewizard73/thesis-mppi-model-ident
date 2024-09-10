@@ -1,0 +1,36 @@
+timestamp_format: '%Y-%m-%d-%H-%M'
+cmd_vel_topic: /cmd_vel
+odom_topic: /odom
+costmap_topic: /local_costmap/costmap
+mppi_critic_topic: /mppi_critic_scores
+maps: [corridor_empty, corridor_mid_obstacles, corridor_side_obstacles]
+corridor_empty:
+  path: 'maps/corridor_empty.yaml'
+  start_pose:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  goal_pose:
+    x: 8.0
+    y: 0.0
+    yaw: 0.0
+corridor_mid_obstacles:
+  path: 'maps/corridor_mid_obstacles.yaml'
+  start_pose:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  goal_pose:
+    x: 8.0
+    y: 0.0
+    yaw: 0.0
+corridor_side_obstacles:
+  path: 'maps/corridor_side_obstacles.yaml'
+  start_pose:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  goal_pose:
+    x: 8.0
+    y: 0.0
+    yaw: 0.0

@@ -441,8 +441,6 @@ def run_test(args):
         controller_benchmark.calculate_metrics()
         controller_benchmark.save_metrics()
 
-
-
     # for each map separate figure
     # - path and odom xy drawn onto map
     # - one critic score plot
