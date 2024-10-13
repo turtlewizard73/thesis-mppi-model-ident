@@ -3,19 +3,14 @@
 # common imports
 from dataclasses import dataclass, field
 import numpy as np
-from typing import List, Tuple
-
-
-# ROS2 imports
-from rclpy.time import Time
-from nav_msgs.msg import Path, Odometry
-from geometry_msgs.msg import TwistStamped
+from typing import Dict
 
 
 @dataclass
 class ControllerResult:
     # represent a result of a parametrized controller run on a single plan/map
     controller_name: str
+    map_name: str
     start_time: float = 0.0  # nanoseconds (to substract from time arrays)
     time_elapsed: float = 0.0  # nanoseconds
     success: bool = False  # if the controller reached the goal approximately
@@ -66,6 +61,12 @@ class ControllerResult:
     #    -> stamp - time [nanoseconds]
     cmd_vel_t: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
 
+    # mppi critic scores
+    # nav2_mppi_controller/msg/CriticScores
+    #  -> critic_names - string[]
+    #  -> critic_scores - float32[]
+    critic_scores: Dict[str, np.ndarray] = field(default_factory=dict)
+
     # avarage cost of robot's center from
     # nav_msgs/OccupancyGrid https://docs.ros.org/en/lunar/api/nav_msgs/html/msg/OccupancyGrid.html
     # -> data - int8[] -> 0-100
@@ -74,38 +75,5 @@ class ControllerResult:
     #    -> width - uint32
     #    -> height - uint32
     avg_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
-
-
-def xy_from_path(path: Path) -> np.ndarray:
-    return np.array(
-        [[pose_.position.x, pose_.position.y] for pose_ in path.poses])
-
-
-def xyt_from_odom(odom: List[Odometry], start_time: float) -> Tuple[np.ndarray, np.ndarray]:
-    valid_odom = [
-        o for o in odom if Time.from_msg(o.header.stamp).nanoseconds >= start_time]
-    n = len(valid_odom)
-    xy = np.empty((n, 2))
-    t = np.empty((n, 1))
-    for i, odom_ in enumerate(valid_odom):
-        timestamp_ns = Time.from_msg(odom_.header.stamp).nanoseconds
-        xy[i] = [odom_.pose.pose.position.x, odom_.pose.pose.position.y]
-        t[i] = timestamp_ns - start_time
-    return xy, t
-
-
-def vxvytomega_from_twist(twist: List[TwistStamped], start_time: float) -> Tuple[np.ndarray, np.ndarray]:
-    valid_twist = [
-        t for t in twist if Time.from_msg(t.header.stamp).nanoseconds >= start_time]
-    n = len(valid_twist)
-    xy = np.empty((n, 2))
-    omega = np.empty((n, 1))
-    t = np.empty((n, 1))
-    for i, twist_ in enumerate(valid_twist):
-        xy[i] = [twist_.twist.linear.x, twist_.twist.linear.y]
-        omega[i] = twist_.twist.angular.z
-        timestamp_ns = Time.from_msg(twist_.header.stamp).nanoseconds
-        t[i] = timestamp_ns - start_time
-    return xy, omega
 
 

@@ -1,6 +1,7 @@
 # Builtin modules
 import os
 from distutils.util import strtobool
+# from memory_profiler import profile
 
 # ROS modules
 from launch import LaunchDescription
@@ -15,7 +16,7 @@ from ament_index_python.packages import get_package_share_directory
 # ROS message types
 # ...
 
-
+# @profile
 def generate_launch_description():
     this_package_dir = get_package_share_directory('controller_benchmark')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
@@ -74,6 +75,7 @@ def generate_launch_description():
             executable='static_transform_publisher',
             name='map_odom_broadcaster',
             output='screen',
+            # prefix=['valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no'],
             parameters=[{'use_sim_time': True}],
             arguments=["0", "0", "0", "0", "0", "0", "map", "odom"]),
 

@@ -23,7 +23,7 @@ RUN find . -mindepth 1 -maxdepth 2 -name "src" -type d -printf '%P\n' \
 #######################################
 # Base Image for apt and pip packages #
 #######################################
-FROM ros:${ROS_DISTRO} as base
+FROM ros:${ROS_DISTRO} AS base
 ENV ROS_DISTRO=${ROS_DISTRO}
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -75,7 +75,7 @@ ENV RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 ##########################################
 # Underlay Image for rosdep dependencies #
 ##########################################
-FROM base as underlay
+FROM base AS underlay
 
 WORKDIR /home/${USERNAME}/thesis-mppi-model-ident/workspace
 COPY --from=cacher /tmp/thesis-mppi-model-ident/workspace/src ./src
