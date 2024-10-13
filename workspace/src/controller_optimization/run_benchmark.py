@@ -73,7 +73,12 @@ def main():
     controller_benchmark.stop_data_collection()
 
     res = controller_benchmark.results[0]
-    fig = controller_benchmark.plot_results(res)
+    controller_benchmark.save_result(res)
+
+    # res = controller_benchmark.load_last_result()
+
+    fig = controller_benchmark.plot_result(res)
+    print(fig.dpi)
     plt.show()
 
 

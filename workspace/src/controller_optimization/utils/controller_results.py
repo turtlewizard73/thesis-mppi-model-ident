@@ -66,6 +66,7 @@ class ControllerResult:
     #  -> critic_names - string[]
     #  -> critic_scores - float32[]
     critic_scores: Dict[str, np.ndarray] = field(default_factory=dict)
+    critic_scores_t: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
 
     # avarage cost of robot's center from
     # nav_msgs/OccupancyGrid https://docs.ros.org/en/lunar/api/nav_msgs/html/msg/OccupancyGrid.html

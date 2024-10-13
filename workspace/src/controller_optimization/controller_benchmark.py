@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import cv2
 import numpy as np
+import pickle
+import glob
 
 # ros imports
 import rclpy
@@ -41,7 +43,7 @@ class MapData:
 class ControllerBenchmark:
     BASE_PATH = os.path.dirname(__file__)
     RESULTS_PATH = os.path.join(BASE_PATH, 'results')
-    METRICS_PATH = os.path.join(RESULTS_PATH, 'metrics')
+    METRICS_PATH = os.path.join(BASE_PATH, 'metrics')
 
     def __init__(self, logger, config_path: str):
         self.logger = logger
@@ -120,8 +122,6 @@ class ControllerBenchmark:
             with open(map_config_path, 'r') as file:
                 map_config = yaml.safe_load(file)
                 self.map_data[map_].resolution = map_config['resolution']
-                # print(map_config['origin'])
-                # print(type(map_config['origin']))
                 self.map_data[map_].origin = np.array(
                     [[map_config['origin'][0], map_config['origin'][1]]])
 
@@ -150,10 +150,9 @@ class ControllerBenchmark:
         # self.costmap_sub = util_nodes.CostmapSubscriber(
         #     topic=self.params['costmap_topic'])
         # self.nodes['costmap_sub'] = self.costmap_sub
-        # # init mppi critic subscriber
-        # self.mppi_critic_sub = util_nodes.MPPICriticSubscriber(
-        #     topic=self.params['mppi_critic_topic'])
-        # self.nodes['mppi_critic_sub'] = self.mppi_critic_sub
+        # init mppi critic subscriber
+        self.mppi_critic_sub = util_nodes.MPPICriticSubscriber(self.params['mppi_critic_topic'])
+        self.nodes['mppi_critic_sub'] = self.mppi_critic_sub
 
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Initialized nodes: \n {pformat(self.nodes)}')
@@ -235,9 +234,6 @@ class ControllerBenchmark:
             # generating global plan
             planner = self.params['planner']
             self.logger.info(f'Getting global plan for {map_} with planner: {planner}.')
-            print(start)
-            print(goal)
-            print(planner)
             global_plan = self.nav.getPath(start, goal, planner, use_start=True)
             if global_plan is None:
                 self.logger.error('Failed to get global plan.')
@@ -263,7 +259,14 @@ class ControllerBenchmark:
                 f' and {end_time.nanoseconds * 1e-9}.')
 
             nav_result = True if self.nav.getResult() == nav2.TaskResult.SUCCEEDED else False
-            odom_xy, odom_t = self.odom_sub.get_data_between(start_time.nanoseconds, end_time.nanoseconds)
+            path_xy = np.array([
+                (pstamped.pose.position.x, pstamped.pose.position.y) for pstamped in global_plan.poses])
+            odom_xy, odom_t = self.odom_sub.get_data_between(
+                start_time.nanoseconds, end_time.nanoseconds)
+            cmd_vel_xy, cmd_vel_omega, cmd_vel_t = self.cmd_vel_sub.get_data_between(
+                start_time.nanoseconds, end_time.nanoseconds)
+            critic_scores, critic_scores_t = self.mppi_critic_sub.get_data_between(
+                start_time.nanoseconds, end_time.nanoseconds)
 
             result = ControllerResult(
                 controller_name=controller,
@@ -271,20 +274,55 @@ class ControllerBenchmark:
                 start_time=start_time.nanoseconds,
                 time_elapsed=time_elapsed.nanoseconds,
                 success=nav_result,
-                path_xy=global_plan,
+                path_xy=path_xy,
                 odom_xy=odom_xy,
                 odom_t=odom_t,
-                cmd_vel_xy=None,
-                cmd_vel_omega=None,
-                cmd_vel_t=None,
+                cmd_vel_xy=cmd_vel_xy,
+                cmd_vel_omega=cmd_vel_omega,
+                cmd_vel_t=cmd_vel_t,
+                critic_scores=critic_scores,
+                critic_scores_t=critic_scores_t,
                 avg_costs=None
             )
 
             self.results.append(result)
 
+    def save_result(self, result: ControllerResult) -> None:
+        self.logger.info(f'Saving result: {result.map_name}.')
+
+        stamp = time.strftime(self.params['timestamp_format'])
+        filename = f'controller_benchmark_result_{stamp}.pickle'
+        with open(os.path.join(self.RESULTS_PATH, filename), 'wb+') as f:
+            pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
+        self.logger.info(f'Written results to: {filename}')
+
+    def load_result(self, path: str) -> ControllerResult:
+        self.logger.info(f'Loading result: {path}.')
+        if os.path.isfile(path) is False:
+            raise ValueError(f'Invalid path to results file: {path}')
+
+        with open(path, 'rb') as file:
+            result: ControllerResult = pickle.load(file)
+        self.logger.info(f'Read result: {result.map_name}.')
+        return result
+
+    def load_last_result(self) -> ControllerResult:
+        results_files = glob.glob(os.path.join(
+            self.RESULTS_PATH, 'controller_benchmark_result_*.pickle'))
+        latest_file_path = max(results_files, key=os.path.getctime)
+        return self.load_result(latest_file_path)
+
     def plot_result(self, result: ControllerResult) -> Figure:
-        fig, (ax_plan, ax_vel, ax_costs, ax_critics) = plt.subplots(
-            ncols=1, nrows=4, sharex=False, sharey=False, num=1)
+        self.logger.info('Plotting result.')
+
+        if self.logger.isEnabledFor(logging.DEBUG):
+            pass
+            # self.logger.debug(f'Path ({result.path_xy.shape}): \n{result.path_xy}')
+            # self.logger.debug(f'Odom ({result.odom_xy.shape}): \n{result.odom_xy}')
+            # self.logger.debug(f'Cmd vel ({result.cmd_vel_xy.shape}): \n{result.cmd_vel_xy}')
+
+        fig, (ax_plan, ax_vel, ax_critics) = plt.subplots(
+            ncols=1, nrows=3, sharex=False, sharey=False, num=1)
 
         # map and route vs plan
         ax_plan.set_title('Plan vs Route')
@@ -295,13 +333,42 @@ class ControllerBenchmark:
         map_resolution = self.map_data[result.map_name].resolution
         map_img = cv2.imread(os.path.join(
             ControllerBenchmark.BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
-        map_img = cv2.resize(map_img, (0, 0), fx=map_resolution, fy=map_resolution)
-        ax_plan.imshow(map_img, cmap='gray')
+
+        height, width = map_img.shape
+        origin_x = self.map_data[result.map_name].origin[0][0]
+        rect_x_min = origin_x  # The minimum x coordinate of the rectangle
+        rect_x_max = width * map_resolution + origin_x  # The maximum x coordinate of the rectangle
+        rect_y_min = - height * map_resolution / 2  # The minimum y coordinate of the rectangle
+        rect_y_max = height * map_resolution / 2  # The maximum y coordinate of the rectangle
+        # map_img = cv2.resize(map_img, (0, 0), fx=map_resolution, fy=map_resolution, interpolation=cv2.INTER_LINEAR)
+        ax_plan.imshow(
+            map_img, cmap='gray', aspect='auto',
+            interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
 
         ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label='Plan', color='g')
-        ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label='Route', color='b')
-
+        ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label='Route', color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
+
+        # velocity graph
+        ax_vel.set_title('Velocity')
+        ax_vel.set_xlabel('Time [s]')
+        ax_vel.set_ylabel('Velocity [m/s], [rad/s]')
+        ax_vel.plot(result.cmd_vel_t, result.cmd_vel_xy[:, 0], label='Velocity x', color='b')
+        ax_vel.plot(result.cmd_vel_t, result.cmd_vel_omega, label='Velocity omega', color='r')
+        ax_vel.grid(visible=True, which='both', axis='both')
+        ax_vel.legend()
+
+        # costs graph
+        # TODO: implement
+
+        # critic scores graph
+        ax_critics.set_title('MPPI Critic scores')
+        ax_critics.set_xlabel('Time [s]')
+        ax_critics.set_ylabel('Score')
+        for critic, scores in result.critic_scores.items():
+            ax_critics.plot(result.critic_scores_t, scores, label=critic)
+        ax_critics.grid(visible=True, which='both', axis='both')
+        ax_critics.legend()
 
         return fig

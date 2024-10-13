@@ -12,8 +12,8 @@ from rclpy.time import Time as RosTime
 
 # ROS message types
 from std_msgs.msg import Header
-from std_srvs.srv import Empty, Trigger
-from geometry_msgs.msg import PoseStamped, Twist, TwistStamped
+from std_srvs.srv import Empty
+from geometry_msgs.msg import PoseStamped, Twist
 from nav_msgs.msg import Path, Odometry
 from visualization_msgs.msg import MarkerArray, Marker
 from gazebo_msgs.srv import SetEntityState, GetEntityState
@@ -163,10 +163,9 @@ class OdomSubscriber(Node):
         self.odom_xy.append([msg.pose.pose.position.x, msg.pose.pose.position.y])
 
     def get_data_between(self, start_time_ns, end_time_ns) -> Tuple[np.ndarray, np.ndarray]:
+        self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
         xy_values = []
         t_values = []
-
-        self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
 
         # theoretically deque is thread-safe, but we are not sure about it
         for _ in range(len(self.odom_t_ns)):
@@ -192,23 +191,22 @@ class CmdVelSubscriber(Node):
         self.collect_data = False
 
         self.subscription = self.create_subscription(
-            TwistStamped, topic, self.callback, 10)
+            Twist, topic, self.callback, 10)
         self.get_logger().info('cmd_vel_subscriber initialized')
 
-    def callback(self, msg: TwistStamped) -> None:
+    def callback(self, msg: Twist) -> None:
         if self.collect_data is False:
             return
         # Append velocity (vx, vy, omega) and timestamp (in nanoseconds) to deques
         self.cmd_vel_t_ns.append(self.get_clock().now().nanoseconds)
-        self.cmd_vel_xy.append([msg.twist.linear.x, msg.twist.linear.y])
-        self.cmd_vel_omega.append(msg.twist.angular.z)
+        self.cmd_vel_xy.append([msg.linear.x, msg.linear.y])
+        self.cmd_vel_omega.append(msg.angular.z)
 
     def get_data_between(self, start_time_ns, end_time_ns) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
         xy_values = []
         omega_values = []
         t_values = []
-
-        self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
 
         # theoretically deque is thread-safe, but we are not sure about it
         for _ in range(len(self.cmd_vel_t_ns)):
@@ -225,36 +223,48 @@ class CmdVelSubscriber(Node):
 
 
 class MPPICriticSubscriber(Node):
-    def __init__(self):
+    def __init__(self, topic: str):
         super().__init__('mppi_critic_subscriber')
-        self.critic_scores = deque()
-        self.critic_scores_t_ns: Dict[str, Deque] = deque()
+        self.critic_scores: Dict[str, Deque] = {}
+        self.critic_scores_t_ns: Deque = deque()
 
         self.collect_data = False
+
+        self.subscription = self.create_subscription(
+            CriticScores, topic, self.callback, 10)
+        self.get_logger().info('mppi_critic_subscriber initialized')
 
     def callback(self, msg: CriticScores):
         if self.collect_data is False:
             return
-
         if len(msg.critic_names) != len(msg.critic_scores):
             raise ValueError('Critic names and scores have different lengths')
 
         self.critic_scores_t_ns.append(self.get_clock().now().nanoseconds)
-        for name, critic in zip(msg.critic_names, msg.critic_scores):
+        for name, score in zip(msg.critic_names, msg.critic_scores):
+            name = name.data
             if name not in self.critic_scores:
                 self.critic_scores[name] = deque()
-            self.critic_scores[name].append(critic)
+            self.critic_scores[name].append(score.data)
 
     def get_data_between(self, start_time_ns, end_time_ns) -> Dict[str, np.ndarray]:
-        critic_scores = {}
-        for name, scores in self.critic_scores.items():
-            critic_scores[name] = []
-            for _ in range(len(scores)):
-                score = scores.popleft()
-                t = self.critic_scores_t_ns.popleft()
+        self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
+        critic_score_values_dict = {}
+        t_values = []
+
+        for _ in range(len(self.critic_scores_t_ns)):
+            t = self.critic_scores_t_ns.popleft()
+
+            for critic in self.critic_scores:
+                score = self.critic_scores[critic].popleft()
+
                 if start_time_ns <= t <= end_time_ns:
-                    critic_scores[name].append(score)
-        return critic_scores
+                    if critic not in critic_score_values_dict:
+                        critic_score_values_dict[critic] = []
+                    critic_score_values_dict[critic].append(score)
+
+            t_values.append(t - start_time_ns)
+        return critic_score_values_dict, np.array(t_values)
 
 
 class CostmapSubscriber(Node):
