@@ -14,7 +14,7 @@ from rclpy.time import Time as RosTime
 from std_msgs.msg import Header
 from std_srvs.srv import Empty
 from geometry_msgs.msg import PoseStamped, Twist
-from nav_msgs.msg import Path, Odometry
+from nav_msgs.msg import Path, Odometry, OccupancyGrid
 from visualization_msgs.msg import MarkerArray, Marker
 from gazebo_msgs.srv import SetEntityState, GetEntityState
 from rcl_interfaces.srv import GetParameters, SetParameters
@@ -268,12 +268,27 @@ class MPPICriticSubscriber(Node):
 
 
 class CostmapSubscriber(Node):
-    def __init__(self, topic: str):
+    def __init__(self, topic: str, robot_radius: float):
         super().__init__('costmap_subscriber')
-        pass
+        self.costmaps_data: Deque = deque()
+        self.costmaps_t_ns: Deque = deque()
+
+        self.collect_data = False
+
+        self.subscription = self.create_subscription(
+            OccupancyGrid, topic, self.callback, 10)
+        self.get_logger().info('costmap_subscriber initialized')
 
     def callback(self, msg):
-        pass
+        if self.collect_data is False:
+            return
+        self.costmaps_t_ns.append(self.get_clock().now().nanoseconds)
+        costmap_data = np.asarray(msg.data)
+        costmap_data.resize((msg.info.height, msg.info.width))
+        self.costmaps_data.append(costmap_data)
+
+        # get avarage cost of robot at the center of the costmap
+        center
 
     def get_msgs(self, start_time: RosTime, end_time: RosTime):
         pass

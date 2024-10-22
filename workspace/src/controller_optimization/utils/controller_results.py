@@ -77,4 +77,7 @@ class ControllerResult:
     #    -> height - uint32
     avg_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
 
+    # min cost of fatal distance
+    min_cost_from_fatal: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+
 

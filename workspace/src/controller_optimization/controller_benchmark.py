@@ -44,6 +44,7 @@ class ControllerBenchmark:
     BASE_PATH = os.path.dirname(__file__)
     RESULTS_PATH = os.path.join(BASE_PATH, 'results')
     METRICS_PATH = os.path.join(BASE_PATH, 'metrics')
+    COSTMAP_RESOLUTION = 0.05  # TODO: get from costmap
 
     def __init__(self, logger, config_path: str):
         self.logger = logger
@@ -146,7 +147,7 @@ class ControllerBenchmark:
         # init cmd_vel subscriber
         self.cmd_vel_sub = util_nodes.CmdVelSubscriber(self.params['cmd_vel_topic'])
         self.nodes['cmd_vel_sub'] = self.cmd_vel_sub
-        # # init costmap subscriber
+        # init costmap subscriber
         # self.costmap_sub = util_nodes.CostmapSubscriber(
         #     topic=self.params['costmap_topic'])
         # self.nodes['costmap_sub'] = self.costmap_sub
