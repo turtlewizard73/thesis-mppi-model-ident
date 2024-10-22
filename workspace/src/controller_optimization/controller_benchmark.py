@@ -26,9 +26,10 @@ from geometry_msgs.msg import PoseStamped
 
 # Custom modules
 import rclpy.time
-from utils.util_functions import yaw2quat, timing_decorator
+from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
 from utils.controller_results import ControllerResult
+from utils.controller_metrics import ControllerMetric
 
 @dataclass
 class MapData:
@@ -63,6 +64,7 @@ class ControllerBenchmark:
         self._init_nodes()
 
         self.nav = nav2.BasicNavigator()
+        self.nodes_active = False
 
         # create directories
         if os.path.isdir(ControllerBenchmark.RESULTS_PATH) is False:
@@ -72,12 +74,22 @@ class ControllerBenchmark:
 
         self.results: List[ControllerResult] = []
 
+    def __del__(self):
+        self.logger.info('Destructor called.')
+        if self.nodes_active:
+            self.stop_nodes()
+
     @timing_decorator(
         lambda self: self.logger.info('Loading config...'),
         lambda self, ex_time: self.logger.info(f'Loaded config in {ex_time:.4f} seconds.'))
     def load_config(self):
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(f'Map config file: {self.config_path}')
+
         with open(self.config_path, 'r') as file:
             data = yaml.safe_load(file)
+            self.logger.debug(f'Config: \n {pformat(data)}')
+
             self.params['timestamp_format'] = data['timestamp_format']
             self.params['robot_name'] = data['robot_name']
             self.params['planner'] = data['planner']
@@ -91,28 +103,33 @@ class ControllerBenchmark:
             self.logger.debug(f'Config: \n {pformat(self.params)}')
 
     @timing_decorator(
-        lambda self: self.logger.info('Loading maps...'),
+        lambda self: self.logger.info('Loading maps from...'),
         lambda self, ex_time: self.logger.info(f'Loaded maps in {ex_time:.4f} seconds.'))
     def load_maps(self):
         # load information from main config file
         with open(self.config_path, 'r') as file:
             data = yaml.safe_load(file)
             for map_ in data.get('maps'):
-                mapdata = MapData(
-                    name=map_, path=os.path.join(
-                        ControllerBenchmark.BASE_PATH, data.get(map_)['path']))
 
-                mapdata.start.header.frame_id = 'map'
-                mapdata.start.pose.position.x = data.get(map_)['start_pose']['x']
-                mapdata.start.pose.position.y = data.get(map_)['start_pose']['y']
+                start = PoseStamped()
+                start.header.frame_id = 'map'
+                start.pose.position.x = data.get(map_)['start_pose']['x']
+                start.pose.position.y = data.get(map_)['start_pose']['y']
                 yaw = data.get(map_)['start_pose']['yaw']
-                mapdata.start.pose.orientation = yaw2quat(yaw)
+                start.pose.orientation = yaw2quat(yaw)
 
-                mapdata.goal.header.frame_id = 'map'
-                mapdata.goal.pose.position.x = data.get(map_)['goal_pose']['x']
-                mapdata.goal.pose.position.y = data.get(map_)['goal_pose']['y']
+                goal = PoseStamped()
+                goal.header.frame_id = 'map'
+                goal.pose.position.x = data.get(map_)['goal_pose']['x']
+                goal.pose.position.y = data.get(map_)['goal_pose']['y']
                 yaw = data.get(map_)['goal_pose']['yaw']
-                mapdata.goal.pose.orientation = yaw2quat(yaw)
+                goal.pose.orientation = yaw2quat(yaw)
+
+                mapdata = MapData(
+                    name=map_,
+                    path=os.path.join(ControllerBenchmark.BASE_PATH, data.get(map_)['path']),
+                    start=start,
+                    goal=goal)
 
                 self.map_data[map_] = mapdata
 
@@ -175,6 +192,8 @@ class ControllerBenchmark:
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Executors created: \n{pformat(self.executors)}')
             self.logger.debug(f'Sub threads started: \n{pformat(self.executor_threads)}')
+
+        self.nodes_active = True
 
     def _spin_executor(self, executor):
         try:
@@ -288,6 +307,39 @@ class ControllerBenchmark:
 
             self.results.append(result)
 
+    @timing_decorator(
+        lambda self: self.logger.info('Calculating metric...'),
+        lambda self, ex_time: self.logger.info(f'Calculated metric in {ex_time:.4f} seconds.'))
+    def calculate_metric(self, result: ControllerResult) -> ControllerMetric:
+        self.logger.info(f'Calculating metric data for result: {result.map_name}.')
+        dist_to_goal = np.linalg.norm(result.path_xy[-1] - result.odom_xy[-1])
+
+        dt = np.diff(result.cmd_vel_t)
+        acc_lin = newton_diff(result.cmd_vel_xy[:, 0], dt)
+        jerk_lin = newton_diff(acc_lin, dt)
+        ms_lin_jerk = np.sqrt(np.mean(jerk_lin**2))
+
+        acc_ang = newton_diff(result.cmd_vel_omega, dt)
+        jerk_ang = newton_diff(acc_ang, dt)
+        ms_ang_jerk = np.sqrt(np.mean(jerk_ang**2))
+
+        return ControllerMetric(
+            controller_name=result.controller_name,
+            map_name=result.map_name,
+            time_elapsed=result.time_elapsed,
+            success=result.success,
+            max_linear_velocity=np.max(result.cmd_vel_xy[:, 0]),
+            avg_linear_velocity=np.mean(result.cmd_vel_xy[:, 0]),
+            max_linear_acceleration=np.max(acc_lin),
+            avg_linear_acceleration=np.mean(acc_lin),
+            max_angular_acceleration=np.max(acc_ang),
+            avg_angular_acceleration=np.mean(acc_ang),
+            distance_to_goal=dist_to_goal,
+            linear_jerks=jerk_lin,
+            ms_linear_jerk=ms_lin_jerk,
+            angular_jerks=jerk_ang,
+            ms_angular_jerk=ms_ang_jerk)
+
     def save_result(self, result: ControllerResult) -> None:
         self.logger.info(f'Saving result: {result.map_name}.')
 
@@ -314,7 +366,7 @@ class ControllerBenchmark:
         return self.load_result(latest_file_path)
 
     def plot_result(self, result: ControllerResult) -> Figure:
-        self.logger.info('Plotting result.')
+        self.logger.info('Generating result plot.')
 
         if self.logger.isEnabledFor(logging.DEBUG):
             pass
@@ -326,7 +378,7 @@ class ControllerBenchmark:
             ncols=1, nrows=3, sharex=False, sharey=False, num=1)
 
         # map and route vs plan
-        ax_plan.set_title('Plan vs Route')
+        # ax_plan.set_title('Plan vs Route')
         ax_plan.set_xlabel('x [m]')
         ax_plan.set_ylabel('y [m]')
 
@@ -352,7 +404,7 @@ class ControllerBenchmark:
         ax_plan.legend()
 
         # velocity graph
-        ax_vel.set_title('Velocity')
+        # ax_vel.set_title('Velocity')
         ax_vel.set_xlabel('Time [s]')
         ax_vel.set_ylabel('Velocity [m/s], [rad/s]')
         ax_vel.plot(result.cmd_vel_t, result.cmd_vel_xy[:, 0], label='Velocity x', color='b')
@@ -364,12 +416,59 @@ class ControllerBenchmark:
         # TODO: implement
 
         # critic scores graph
-        ax_critics.set_title('MPPI Critic scores')
+        # ax_critics.set_title('MPPI Critic scores')
         ax_critics.set_xlabel('Time [s]')
-        ax_critics.set_ylabel('Score')
+        ax_critics.set_ylabel('MPPI Critic scores')
         for critic, scores in result.critic_scores.items():
             ax_critics.plot(result.critic_scores_t, scores, label=critic)
         ax_critics.grid(visible=True, which='both', axis='both')
         ax_critics.legend()
 
         return fig
+
+    def plot_metric(
+            self, result: ControllerResult, metric: ControllerMetric) -> Figure:
+        self.logger.info('Generating metric plot.')
+
+        # plot1: same as result plot
+        # plot2: jerks vs time
+        fig, (ax_plan, ax_jerk) = plt.subplots(
+            ncols=1, nrows=2, sharex=False, sharey=False, num=1)
+
+        # map and route vs plan
+        # ax_plan.set_title('Plan vs Route')
+        ax_plan.set_xlabel('x [m]')
+        ax_plan.set_ylabel('y [m]')
+
+        map_path = self.map_data[result.map_name].path.replace('.yaml', '.png')
+        map_resolution = self.map_data[result.map_name].resolution
+        map_img = cv2.imread(os.path.join(
+            ControllerBenchmark.BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
+
+        height, width = map_img.shape
+        origin_x = self.map_data[result.map_name].origin[0][0]
+        rect_x_min = origin_x  # The minimum x coordinate of the rectangle
+        rect_x_max = width * map_resolution + origin_x  # The maximum x coordinate of the rectangle
+        rect_y_min = - height * map_resolution / 2  # The minimum y coordinate of the rectangle
+        rect_y_max = height * map_resolution / 2  # The maximum y coordinate of the rectangle
+        # map_img = cv2.resize(map_img, (0, 0), fx=map_resolution, fy=map_resolution, interpolation=cv2.INTER_LINEAR)
+        ax_plan.imshow(
+            map_img, cmap='gray', aspect='auto',
+            interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
+
+        plan_label = f'Plan - dist: {metric.distance_to_goal:.2f} [m]'
+        ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label=plan_label, color='g')
+        route_label = f'Route - time: {metric.time_elapsed:.2f} [s]'
+        ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label=route_label, color='r')
+        ax_plan.grid(visible=True, which='both', axis='both')
+        ax_plan.legend()
+
+        # jerk graph
+        # ax_jerk.set_title('Jerk')
+        ax_jerk.set_xlabel('Time [s]')
+        ax_jerk.set_ylabel('Jerk [m/s^3], [rad/s^3]')
+        ax_jerk.plot(result.cmd_vel_t[1:], metric.linear_jerks, label='Linear jerk', color='b')
+        ax_jerk.plot(result.cmd_vel_t[1:], metric.angular_jerks, label='Angular jerk', color='r')
+
+        return fig
+

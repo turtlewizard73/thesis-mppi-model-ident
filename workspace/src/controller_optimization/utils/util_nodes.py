@@ -176,6 +176,9 @@ class OdomSubscriber(Node):
                 xy_values.append(xy)
                 t_values.append(t - start_time_ns)  # Wrap t to match desired ndarray shape (0, 1))
 
+        # check
+        assert len(xy_values) == len(t_values), 'Length of xy_values and t_values should be the same'
+
         # Convert lists to NumPy arrays
         return np.array(xy_values), np.array(t_values)
 
@@ -219,6 +222,10 @@ class CmdVelSubscriber(Node):
                 omega_values.append(omega)
                 t_values.append(t - start_time_ns)
 
+        # check
+        assert len(xy_values) == len(t_values), 'Length of xy_values and t_values should be the same'
+        assert len(omega_values) == len(t_values), 'Length of xy_values and omega_values should be the same'
+
         return np.array(xy_values), np.array(omega_values), np.array(t_values)
 
 
@@ -249,21 +256,33 @@ class MPPICriticSubscriber(Node):
 
     def get_data_between(self, start_time_ns, end_time_ns) -> Dict[str, np.ndarray]:
         self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
-        critic_score_values_dict = {}
-        t_values = []
+        critic_score_values_dict: Dict[str, np.ndarray] = {}
+        t_values: List[float] = []
 
         for _ in range(len(self.critic_scores_t_ns)):
             t = self.critic_scores_t_ns.popleft()
 
+            # for each critic
             for critic in self.critic_scores:
-                score = self.critic_scores[critic].popleft()
+                score = self.critic_scores[critic].popleft()  # get the next score for the critic
 
-                if start_time_ns <= t <= end_time_ns:
-                    if critic not in critic_score_values_dict:
-                        critic_score_values_dict[critic] = []
-                    critic_score_values_dict[critic].append(score)
+                if t < start_time_ns:
+                    continue
+
+                if t > end_time_ns:
+                    continue
+
+                # if start_time_ns <= t <= end_time_ns:
+                # if the critic is not in the dict, add it
+                if critic not in critic_score_values_dict:
+                    critic_score_values_dict[critic] = []
+                critic_score_values_dict[critic].append(score)
 
             t_values.append(t - start_time_ns)
+
+        for critic in critic_score_values_dict:
+            assert len(critic_score_values_dict[critic]) == len(t_values), \
+                'Length of critic scores and t_values should be the same'
         return critic_score_values_dict, np.array(t_values)
 
 

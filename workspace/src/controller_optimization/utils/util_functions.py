@@ -2,6 +2,7 @@
 
 # Common modules
 import time
+import numpy as np
 from functools import wraps
 from scipy.spatial.transform import Rotation
 
@@ -41,3 +42,15 @@ def yaw2quat(yaw: float) -> Quaternion:
     quat.z = q[2]
     quat.w = q[3]
     return quat
+
+
+def newton_diff(y: np.ndarray, dt: float) -> np.ndarray:
+    derivative = np.zeros_like(y)
+    # Central differences
+    derivative[2:-2] = (-y[4:] + 8*y[3:-1] - 8*y[1:-3] + y[0:-4]) / (12 * dt)
+    # Use lower-order methods at the boundaries
+    derivative[0] = (y[1] - y[0]) / dt  # Forward difference for the first point
+    derivative[1] = (y[2] - y[0]) / (2 * dt)  # Central difference for the second point
+    derivative[-2] = (y[-1] - y[-3]) / (2 * dt)  # Central difference for the second last point
+    derivative[-1] = (y[-1] - y[-2]) / dt  # Backward difference for the last point
+    return derivative

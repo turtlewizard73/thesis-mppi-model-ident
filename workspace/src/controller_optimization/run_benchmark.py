@@ -67,20 +67,23 @@ def main():
             BASE_PATH, 'config/controller_benchmark_config.yaml')
     )
 
-    # controller_benchmark.launch_nodes()
-    # controller_benchmark.start_data_collection()
-    # controller_benchmark.run_benchmark()
-    # controller_benchmark.stop_data_collection()
+    if args.plot_only is False:
+        controller_benchmark.launch_nodes()
+        controller_benchmark.start_data_collection()
+        controller_benchmark.run_benchmark()
+        controller_benchmark.stop_data_collection()
+        res = controller_benchmark.results[0]
+        controller_benchmark.save_result(res)
+        controller_benchmark.stop_nodes()
+    else:
+        res = controller_benchmark.load_last_result()
+        fig_result = controller_benchmark.plot_result(res)
 
-    # res = controller_benchmark.results[0]
-    # controller_benchmark.save_result(res)
+        metric = controller_benchmark.calculate_metric(res)
+        fig_metrics = controller_benchmark.plot_metrics(metric)
+        plt.show()
 
-    res = controller_benchmark.load_last_result()
-
-    fig = controller_benchmark.plot_result(res)
-    print(fig.dpi)
-    plt.show()
-
+    exit(0)
 
 if __name__ == '__main__':
     main()
