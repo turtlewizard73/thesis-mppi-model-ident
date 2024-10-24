@@ -31,6 +31,7 @@ import utils.util_nodes as util_nodes
 from utils.controller_results import ControllerResult
 from utils.controller_metrics import ControllerMetric
 
+
 @dataclass
 class MapData:
     name: str
@@ -86,7 +87,7 @@ class ControllerBenchmark:
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Map config file: {self.config_path}')
 
-        with open(self.config_path, 'r') as file:
+        with open(self.config_path, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
             self.logger.debug(f'Config: \n {pformat(data)}')
 
@@ -107,7 +108,7 @@ class ControllerBenchmark:
         lambda self, ex_time: self.logger.info(f'Loaded maps in {ex_time:.4f} seconds.'))
     def load_maps(self):
         # load information from main config file
-        with open(self.config_path, 'r') as file:
+        with open(self.config_path, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
             for map_ in data.get('maps'):
 
@@ -134,13 +135,22 @@ class ControllerBenchmark:
                 self.map_data[map_] = mapdata
 
         # load information from map config files
-        for map_ in self.map_data.keys():
+        # for map_ in self.map_data.keys():
+        #     map_config_path = os.path.join(
+        #         ControllerBenchmark.BASE_PATH, self.map_data[map_].path)
+        #     with open(map_config_path, 'r') as file:
+        #         map_config = yaml.safe_load(file)
+        #         self.map_data[map_].resolution = map_config['resolution']
+        #         self.map_data[map_].origin = np.array(
+        #             [[map_config['origin'][0], map_config['origin'][1]]])
+
+        for map_name, map_data in self.map_data.items():
             map_config_path = os.path.join(
-                ControllerBenchmark.BASE_PATH, self.map_data[map_].path)
-            with open(map_config_path, 'r') as file:
+                ControllerBenchmark.BASE_PATH, map_data.path)
+            with open(map_config_path, 'r', encoding='utf-8') as file:
                 map_config = yaml.safe_load(file)
-                self.map_data[map_].resolution = map_config['resolution']
-                self.map_data[map_].origin = np.array(
+                self.map_data[map_name].resolution = map_config['resolution']
+                self.map_data[map_name].origin = np.array(
                     [[map_config['origin'][0], map_config['origin'][1]]])
 
         if self.logger.isEnabledFor(logging.DEBUG):
@@ -200,7 +210,6 @@ class ControllerBenchmark:
             executor.spin()
         except rclpy.executors.ExternalShutdownException:
             self.logger.warn('Executor failed to spin')
-            pass
 
     def start_data_collection(self):
         self.logger.info('Starting data collection.')
@@ -471,4 +480,3 @@ class ControllerBenchmark:
         ax_jerk.plot(result.cmd_vel_t[1:], metric.angular_jerks, label='Angular jerk', color='r')
 
         return fig
-
