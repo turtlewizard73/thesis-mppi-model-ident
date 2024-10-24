@@ -22,6 +22,8 @@ from nav2_mppi_controller.msg import CriticScores
 
 # Custom modules
 import utils.util_functions as util_funs
+
+
 class MarkerServer(Node):
     """
     This class represents a marker server that publishes markers and paths.
@@ -151,10 +153,6 @@ class OdomSubscriber(Node):
     #     response.message = 'Started collecting data' if self.collect_data else 'Stopped collecting data'
     #     return response
 
-    def start_stop_collecting(self) -> str:
-        self.collect_data = not self.collect_data
-        return 'started collecting data' if self.collect_data else 'stopped collecting data'
-
     def callback(self, msg: Odometry) -> None:
         if self.collect_data is False:
             return
@@ -177,7 +175,8 @@ class OdomSubscriber(Node):
                 t_values.append(t - start_time_ns)  # Wrap t to match desired ndarray shape (0, 1))
 
         # check
-        assert len(xy_values) == len(t_values), 'Length of xy_values and t_values should be the same'
+        assert len(xy_values) == len(
+            t_values), 'Length of xy_values and t_values should be the same'
 
         # Convert lists to NumPy arrays
         return np.array(xy_values), np.array(t_values)
@@ -223,8 +222,10 @@ class CmdVelSubscriber(Node):
                 t_values.append(t - start_time_ns)
 
         # check
-        assert len(xy_values) == len(t_values), 'Length of xy_values and t_values should be the same'
-        assert len(omega_values) == len(t_values), 'Length of xy_values and omega_values should be the same'
+        assert len(xy_values) == len(
+            t_values), 'Length of xy_values and t_values should be the same'
+        assert len(omega_values) == len(
+            t_values), 'Length of xy_values and omega_values should be the same'
 
         return np.array(xy_values), np.array(omega_values), np.array(t_values)
 
@@ -232,6 +233,9 @@ class CmdVelSubscriber(Node):
 class MPPICriticSubscriber(Node):
     def __init__(self, topic: str):
         super().__init__('mppi_critic_subscriber')
+
+        self.critic_scores_q: Deque[float, ]
+
         self.critic_scores: Dict[str, Deque] = {}
         self.critic_scores_t_ns: Deque = deque()
 
@@ -244,6 +248,9 @@ class MPPICriticSubscriber(Node):
     def callback(self, msg: CriticScores):
         if self.collect_data is False:
             return
+        self.get_logger().info(f'{msg}')
+        return
+
         if len(msg.critic_names) != len(msg.critic_scores):
             raise ValueError('Critic names and scores have different lengths')
 
@@ -254,28 +261,26 @@ class MPPICriticSubscriber(Node):
                 self.critic_scores[name] = deque()
             self.critic_scores[name].append(score.data)
 
-    def get_data_between(self, start_time_ns, end_time_ns) -> Dict[str, np.ndarray]:
+    def get_data_between_old(self, start_time_ns, end_time_ns) -> Dict[str, np.ndarray]:
         self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
-        critic_score_values_dict: Dict[str, np.ndarray] = {}
+        critic_score_values_dict: Dict[str, List[np.ndarray]] = {
+            critic: [] for critic in self.critic_scores}
         t_values: List[float] = []
 
         for _ in range(len(self.critic_scores_t_ns)):
             t = self.critic_scores_t_ns.popleft()
 
             # for each critic
-            for critic in self.critic_scores:
-                score = self.critic_scores[critic].popleft()  # get the next score for the critic
+            for critic, critic_score_q in self.critic_scores.items():
+                score = critic_score_q.popleft()  # get the next score for the critic
 
-                if t < start_time_ns:
+                if t < start_time_ns or t > end_time_ns:
                     continue
 
-                if t > end_time_ns:
-                    continue
-
-                # if start_time_ns <= t <= end_time_ns:
                 # if the critic is not in the dict, add it
                 if critic not in critic_score_values_dict:
                     critic_score_values_dict[critic] = []
+
                 critic_score_values_dict[critic].append(score)
 
             t_values.append(t - start_time_ns)
@@ -283,6 +288,28 @@ class MPPICriticSubscriber(Node):
         for critic in critic_score_values_dict:
             assert len(critic_score_values_dict[critic]) == len(t_values), \
                 'Length of critic scores and t_values should be the same'
+        return critic_score_values_dict, np.array(t_values)
+
+    def get_data_between(self, start_time_ns, end_time_ns) -> Dict[str, np.ndarray]:
+        self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
+
+        critic_score_values_dict: Dict[str, List[np.ndarray]] = {
+            critic: [] for critic in self.critic_scores}
+        t_values: List[float] = []
+
+        while self.critic_scores_t_ns and self.critic_scores_t_ns[0] <= end_time_ns:
+            t = self.critic_scores_t_ns.popleft()
+
+            if t < start_time_ns:
+                continue
+
+            # Append the times to t_values
+            t_values.append(t - start_time_ns)
+
+            # Collect scores for each critic
+            for critic, critic_score_q in self.critic_scores.items():
+                critic_score_values_dict[critic].append(critic_score_q.popleft())
+
         return critic_score_values_dict, np.array(t_values)
 
 
@@ -311,5 +338,3 @@ class CostmapSubscriber(Node):
 
     def get_msgs(self, start_time: RosTime, end_time: RosTime):
         pass
-
-
