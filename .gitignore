@@ -1,7 +1,11 @@
 workspace/build
 workspace/install
+workspace/src/controller_benchmark/maps_generated/*
 workspace/log
 build
 install
 log
 nav2_humble_cache/*
+*.pickle
+*.log
+*__pycache__*

@@ -115,8 +115,12 @@
 
     // ---------------- Spell Checker ----------------
     "cSpell.words": [
+      "amcl",
+      "aruco",
       "athackst",
       "autopep",
+      "bringup",
+      "carto",
       "cmake",
       "comms",
       "cppcheck",
@@ -124,9 +128,15 @@
       "DCMAKE",
       "deque",
       "devcontainer",
+      "gzclient",
+      "gzserver",
+      "imread",
+      "imwrite",
       "ints",
+      "ncols",
       "ndarray",
       "noqa",
+      "nrows",
       "Odometry",
       "pytest",
       "rclcpp",
@@ -136,18 +146,15 @@
       "rosdistro",
       "rosidl",
       "RTPS",
+      "rviz",
       "scipy",
-      "uncrustify",
-      "Wextra",
-      "Wpedantic",
-      "xmllint",
-      "aruco",
-      "imwrite",
-      "imread",
       "uid",
       "uids",
-      "amcl",
-      "carto"
+      "uncrustify",
+      "urdf",
+      "Wextra",
+      "Wpedantic",
+      "xmllint"
     ],
     "cSpell.allowCompoundWords": true,
     "cSpell.ignorePaths": [
@@ -164,9 +171,12 @@
     "git.detectSubmodulesLimit": 30,
 
     // ---------------- Python ----------------
+    "python.languageServer": "Default",
     "python.analysis.extraPaths": [
       "./**",
       "/usr/local/lib/python3.10/dist-packages",
+      "/opt/ros/humble/bin",
+      "/opt/ros/humble/lib",
       "/opt/ros/humble/lib/python3.10/site-packages",
       "/opt/ros/humble/local/lib/python3.10/site-packages"
     ],
@@ -174,6 +184,8 @@
     "python.autoComplete.extraPaths": [
       "./**",
       "/usr/local/lib/python3.10/dist-packages",
+      "/opt/ros/humble/bin",
+      "/opt/ros/humble/lib",
       "/opt/ros/humble/lib/python3.10/site-packages",
       "/opt/ros/humble/local/lib/python3.10/site-packages"
     ],
