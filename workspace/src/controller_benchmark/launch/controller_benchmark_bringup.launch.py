@@ -13,10 +13,7 @@ from launch_ros.actions import Node
 from launch.conditions import IfCondition
 from ament_index_python.packages import get_package_share_directory
 
-# ROS message types
-# ...
 
-# @profile
 def generate_launch_description():
     this_package_dir = get_package_share_directory('controller_benchmark')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
@@ -28,10 +25,11 @@ def generate_launch_description():
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
 
     # nav_config_file = 'nav2_params_mppi.yaml' if use_basic_config is False else 'nav2_params.yaml'
-    nav_config = os.path.join(this_package_dir, 'nav2_mppi_test.yaml')
+    nav_config = os.path.join(this_package_dir, 'default_nav2_params.yaml')
 
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
-    world = os.path.join(this_package_dir, 'empty_world.world')  # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
+    # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
+    world = os.path.join(this_package_dir, 'empty_world.world')
 
     urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
     with open(urdf, 'r') as urdf_file:

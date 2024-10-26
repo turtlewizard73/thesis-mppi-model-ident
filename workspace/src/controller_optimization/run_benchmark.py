@@ -5,12 +5,10 @@ import argparse
 import logging
 import os
 from time import strftime
-import time
 import matplotlib.pyplot as plt
+from controller_benchmark import ControllerBenchmark
 
 BASE_PATH = os.path.dirname(__file__)
-
-from controller_benchmark import ControllerBenchmark
 
 
 def main():
@@ -85,10 +83,11 @@ def main():
         fig_result = controller_benchmark.plot_result(res)
 
         metric = controller_benchmark.calculate_metric(res)
-        fig_metrics = controller_benchmark.plot_metrics(metric)
+        fig_metrics = controller_benchmark.plot_metric(res, metric)
         plt.show()
 
     exit(0)
+
 
 if __name__ == '__main__':
     main()

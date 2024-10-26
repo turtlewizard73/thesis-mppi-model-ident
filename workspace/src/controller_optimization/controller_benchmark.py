@@ -374,6 +374,31 @@ class ControllerBenchmark:
         latest_file_path = max(results_files, key=os.path.getctime)
         return self.load_result(latest_file_path)
 
+    def save_metric(self, metric: ControllerMetric) -> None:
+        self.logger.info(f'Saving metric: {metric.map_name}.')
+
+        stamp = time.strftime(self.params['timestamp_format'])
+        filename = f'controller_benchmark_metric_{stamp}.pickle'
+        with open(os.path.join(self.METRICS_PATH, filename), 'wb+') as f:
+            pickle.dump(metric, f, pickle.HIGHEST_PROTOCOL)
+        self.logger.info(f'Written metric to: {filename}')
+
+    def load_metric(self, path: str) -> ControllerMetric:
+        self.logger.info(f'Loading metric: {path}.')
+        if os.path.isfile(path) is False:
+            raise ValueError(f'Invalid path to metric file: {path}')
+
+        with open(path, 'rb') as file:
+            metric: ControllerMetric = pickle.load(file)
+        self.logger.info(f'Read metric: {metric.map_name}.')
+        return metric
+
+    def load_last_metric(self) -> ControllerMetric:
+        metrics_files = glob.glob(os.path.join(
+            self.METRICS_PATH, 'controller_benchmark_metric_*.pickle'))
+        latest_file_path = max(metrics_files, key=os.path.getctime)
+        return self.load_metric(latest_file_path)
+
     def plot_result(self, result: ControllerResult) -> Figure:
         self.logger.info('Generating result plot.')
 
@@ -442,7 +467,7 @@ class ControllerBenchmark:
         # plot1: same as result plot
         # plot2: jerks vs time
         fig, (ax_plan, ax_jerk) = plt.subplots(
-            ncols=1, nrows=2, sharex=False, sharey=False, num=1)
+            ncols=1, nrows=2, sharex=False, sharey=False, num=2)
 
         # map and route vs plan
         # ax_plan.set_title('Plan vs Route')
@@ -467,16 +492,25 @@ class ControllerBenchmark:
 
         plan_label = f'Plan - dist: {metric.distance_to_goal:.2f} [m]'
         ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label=plan_label, color='g')
-        route_label = f'Route - time: {metric.time_elapsed:.2f} [s]'
+        time_s = metric.time_elapsed * 1e-9
+        route_label = f'Route - time: {time_s:.2f} [s]'
         ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label=route_label, color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
 
         # jerk graph
         # ax_jerk.set_title('Jerk')
+        cmd_vel_t_s = result.cmd_vel_t * 1e-9
         ax_jerk.set_xlabel('Time [s]')
         ax_jerk.set_ylabel('Jerk [m/s^3], [rad/s^3]')
-        ax_jerk.plot(result.cmd_vel_t[1:], metric.linear_jerks, label='Linear jerk', color='b')
-        ax_jerk.plot(result.cmd_vel_t[1:], metric.angular_jerks, label='Angular jerk', color='r')
+        label = f'Linear jerk - RMS: {metric.ms_linear_jerk:.2f} [m/s^3]'
+        ax_jerk.plot(cmd_vel_t_s, metric.linear_jerks, label=label, color='b')
+        label = f'Angular jerk - RMS: {metric.ms_angular_jerk:.2f} [rad/s^3]'
+        ax_jerk.plot(cmd_vel_t_s, metric.angular_jerks, label=label, color='r')
+        ax_jerk.grid(visible=True, which='both', axis='both')
+        ax_jerk.legend()
+
+        # TODO: make nicer data vis
+        self.logger.info(metric.to_table_string())
 
         return fig
