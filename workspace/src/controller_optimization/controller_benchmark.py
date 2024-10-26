@@ -323,7 +323,7 @@ class ControllerBenchmark:
         self.logger.info(f'Calculating metric data for result: {result.map_name}.')
         dist_to_goal = np.linalg.norm(result.path_xy[-1] - result.odom_xy[-1])
 
-        dt = np.diff(result.cmd_vel_t)
+        dt = np.mean(result.cmd_vel_t)
         acc_lin = newton_diff(result.cmd_vel_xy[:, 0], dt)
         jerk_lin = newton_diff(acc_lin, dt)
         ms_lin_jerk = np.sqrt(np.mean(jerk_lin**2))

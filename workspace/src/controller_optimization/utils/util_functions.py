@@ -54,3 +54,17 @@ def newton_diff(y: np.ndarray, dt: float) -> np.ndarray:
     derivative[-2] = (y[-1] - y[-3]) / (2 * dt)  # Central difference for the second last point
     derivative[-1] = (y[-1] - y[-2]) / dt  # Backward difference for the last point
     return derivative
+
+
+def newton_diff_nonuniform(y: np.ndarray, t: np.ndarray) -> np.ndarray:
+    derivative = np.zeros_like(y)
+    dt_forward = t[1:] - t[:-1]  # Time differences between each consecutive time step
+
+    # Use central differences for interior points
+    derivative[1:-1] = (y[2:] - y[:-2]) / (t[2:] - t[:-2])
+
+    # Handle boundaries with forward and backward differences
+    derivative[0] = (y[1] - y[0]) / dt_forward[0]  # Forward difference for the first point
+    derivative[-1] = (y[-1] - y[-2]) / dt_forward[-1]  # Backward difference for the last point
+
+    return derivative

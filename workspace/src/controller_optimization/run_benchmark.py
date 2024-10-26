@@ -84,8 +84,8 @@ def main():
         res = controller_benchmark.load_last_result()
         fig_result = controller_benchmark.plot_result(res)
 
-        # metric = controller_benchmark.calculate_metric(res)
-        # fig_metrics = controller_benchmark.plot_metrics(metric)
+        metric = controller_benchmark.calculate_metric(res)
+        fig_metrics = controller_benchmark.plot_metrics(metric)
         plt.show()
 
     exit(0)
