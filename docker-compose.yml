@@ -11,9 +11,10 @@ services:
     container_name: thesis_container_dev
     network_mode: "host"
     environment:
-      - DISPLAY
+      - DISPLAY=:0.0
       - MAKEFLAGS="-j6 -l6"
       - ROS_DOMAIN_ID=9
+      - TURTLE_HOME_IP=100.85.120.127
       # - MIXINS
       # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
     logging:
@@ -32,35 +33,35 @@ services:
     group_add:
       - plugdev
 
-  thesis_container_berry:
-    image: ${DOCKER_REGISTRY}thesis_container_berry
-    platform: linux/arm64/v8
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        USERNAME: turtlewizard
-        ROS_DISTRO: humble
-    container_name: thesis_container_berry
-    network_mode: "host"
-    environment:
-      - DISPLAY
-      - MAKEFLAGS="-j6 -l6"
-      - ROS_DOMAIN_ID=9
-      # - MIXINS
-      # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
-    logging:
-      driver: "journald"
-    stdin_open: true
-    tty: true
-    stop_signal: SIGINT
-    privileged: true
-    volumes:
-      - /dev:/dev
-      - ./:/home/turtlewizard/thesis-mppi-model-ident
-      - /tmp/.X11-unix:/tmp/.X11-unix
-      - ~/.gitconfig:/home/ubuntu/.gitconfig
-      - ~/.ssh:/home/ubuntu/.ssh
-    group_add:
-      - plugdev
+  # thesis_container_berry:
+  #   image: ${DOCKER_REGISTRY}thesis_container_berry
+  #   platform: linux/arm64/v8
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #     args:
+  #       USERNAME: turtlewizard
+  #       ROS_DISTRO: humble
+  #   container_name: thesis_container_berry
+  #   network_mode: "host"
+  #   environment:
+  #     - DISPLAY
+  #     - MAKEFLAGS="-j6 -l6"
+  #     - ROS_DOMAIN_ID=9
+  #     # - MIXINS
+  #     # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
+  #   logging:
+  #     driver: "journald"
+  #   stdin_open: true
+  #   tty: true
+  #   stop_signal: SIGINT
+  #   privileged: true
+  #   volumes:
+  #     - /dev:/dev
+  #     - ./:/home/turtlewizard/thesis-mppi-model-ident
+  #     - /tmp/.X11-unix:/tmp/.X11-unix
+  #     - ~/.gitconfig:/home/ubuntu/.gitconfig
+  #     - ~/.ssh:/home/ubuntu/.ssh
+  #   group_add:
+  #     - plugdev
 
