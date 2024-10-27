@@ -2,7 +2,6 @@
 
 # Common modules
 import time
-# import yaml
 import yaml
 import numpy as np
 from functools import wraps
