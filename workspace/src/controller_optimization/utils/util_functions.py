@@ -2,6 +2,7 @@
 
 # Common modules
 import time
+# import yaml
 import yaml
 import numpy as np
 from functools import wraps
@@ -38,28 +39,32 @@ def timing_decorator(on_start, on_end):
 def flatten_dict(d: dict, parent_key: str = '', sep: str = '.'):
     flat_data = {}
     for key, value in d.items():
+        if 'qos' in key:
+            continue
         new_key = f'{parent_key}{sep}{key}' if parent_key else key
         if isinstance(value, dict):
             flat_data.update(flatten_dict(d=value, parent_key=new_key, sep=sep))
-        # elif isinstance(value, list):
-            # flat_data[new_key] = yaml.dump(value, default_flow_style=True).strip()
         else:
             flat_data[new_key] = value
     return flat_data
 
 
 def reformat_yaml(input_file: str, output_file: str):
-    with open(input_file, 'r') as file:
+    with open(input_file, 'r', encoding='utf-8') as file:
         data = yaml.safe_load(file)
 
     flat_data = {}
     for node_name, node_params in data.items():
         ros_parameters = node_params['ros__parameters']
+        node_name = node_name if node_name.startswith("/") else f"/{node_name}"
+        flat_data.update({
+            node_name: {
+                'ros__parameters': flatten_dict(ros_parameters)
+                }
+            })
 
-        flat_data.update(flatten_dict(ros_parameters, node_name))
-
-    with open(output_file, 'w') as file:
-        file.write(yaml.dump(flat_data, default_flow_style=True))
+    with open(output_file, 'w', encoding='utf-8') as file:
+        file.write(yaml.dump(flat_data, default_flow_style=None))
 
 
 def yaw2quat(yaw: float) -> Quaternion:
