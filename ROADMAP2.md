@@ -19,3 +19,7 @@
 - szóval a következmény hogy msg beérkezésekor új időt kell adni ami azért jó mert gyakorlatilag controllert is az befolyásolja (minden feliratkozó egyszerre kapja meg) tehát az az idő számít amikor megkapja nem amikor létrejött a msg
 - meg amúgy is a szimuláció konstans fut szóval ott is kérdőjelek
 
+
+## 2024. 10. 27.
+- fut metricek is
+- paraméter újratöltésen elkezdtem dolgozni

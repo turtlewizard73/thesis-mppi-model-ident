@@ -28,6 +28,7 @@ def generate_launch_description():
     nav_config = os.path.join(this_package_dir, 'default_nav2_params.yaml')
 
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
+    # lifecycle_nodes = ['map_server', 'planner_server']
     # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
     world = os.path.join(this_package_dir, 'empty_world.world')
 
