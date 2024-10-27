@@ -197,13 +197,6 @@
       plugin: nav2_controller::SimpleProgressChecker
       required_movement_radius: 0.5
     progress_checker_plugin: progress_checker
-    qos_overrides:
-      /clock:
-        subscription:
-          depth: 1
-          durability: volatile
-          history: keep_last
-          reliability: best_effort
     speed_limit_topic: speed_limit
     use_sim_time: true
 

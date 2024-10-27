@@ -2,6 +2,7 @@
 
 # Common modules
 import time
+# import yaml
 import yaml
 import numpy as np
 from functools import wraps
@@ -38,6 +39,8 @@ def timing_decorator(on_start, on_end):
 def flatten_dict(d: dict, parent_key: str = '', sep: str = '.'):
     flat_data = {}
     for key, value in d.items():
+        if 'qos' in key:
+            continue
         if 'qos' in key:
             continue
         new_key = f'{parent_key}{sep}{key}' if parent_key else key
