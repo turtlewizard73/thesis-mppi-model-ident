@@ -75,8 +75,8 @@ def main():
         controller_benchmark.stop_nodes()
 
         fig_result = controller_benchmark.plot_result(res)
-        # metric = controller_benchmark.calculate_metric(res)
-        # fig_result = controller_benchmark.plot_result(res)
+        metric = controller_benchmark.calculate_metric(res)
+        fig_metric= controller_benchmark.plot_metric(res, metric)
         plt.show()
     else:
         res = controller_benchmark.load_last_result()

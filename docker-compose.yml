@@ -13,7 +13,7 @@ services:
     environment:
       - DISPLAY=:0.0
       - MAKEFLAGS="-j6 -l6"
-      - ROS_DOMAIN_ID=9
+      - ROS_DOMAIN_ID=73
       - TURTLE_HOME_IP=100.85.120.127
       # - MIXINS
       # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
@@ -47,7 +47,7 @@ services:
   #   environment:
   #     - DISPLAY
   #     - MAKEFLAGS="-j6 -l6"
-  #     - ROS_DOMAIN_ID=9
+  #     - ROS_DOMAIN_ID=73
   #     # - MIXINS
   #     # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
   #   logging:

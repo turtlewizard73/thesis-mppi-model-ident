@@ -37,6 +37,7 @@ alias gf='git fetch'
 alias rosbuild="cd ~/thesis-mppi-model-ident/workspace &&
     colcon build --symlink-install --cmake-args ' -DCMAKE_EXPORT_COMPILE_COMMANDS=ON' '-DCMAKE_BUILD_TYPE=Debug' --packages-select controller_benchmark nav2_mppi_controller"
 alias copy_install="rsync -avh --delete -e ssh ~/thesis-mppi-model-ident/workspace/install $TURTLE_HOME_IP:~/repos/thesis-mppi-model-ident/workspace/"
+alias bringup='ros2 launch controller_benchmark controller_benchmark_bringup.launch.py'
 
 # Execute the command passed into this entrypoint
 exec "$@"

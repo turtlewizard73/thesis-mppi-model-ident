@@ -23,3 +23,8 @@
 ## 2024. 10. 27.
 - fut metricek is
 - paraméter újratöltésen elkezdtem dolgozni
+
+!!!!!!!!!!!
+metrikák ból egy függvény ugye hogy közel milyen jó lenne pl
+(sebesség optimális - mért) * súly .....
+aztán kézzel irányítani -> majd abcd súlyokkal görbét illeszteni
