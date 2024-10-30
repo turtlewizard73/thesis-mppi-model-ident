@@ -5,6 +5,7 @@ import logging
 import os
 import yaml
 from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple
 from pprint import pformat
 from threading import Thread
 import time
@@ -30,6 +31,7 @@ from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
 from utils.controller_results import ControllerResult
 from utils.controller_metrics import ControllerMetric
+from utils.parameter_manager import ParameterManager
 from utils.parameter_manager import ParameterManager
 
 
@@ -179,6 +181,9 @@ class ControllerBenchmark:
         lambda self, ex_time: self.logger.info(f'Initialized nodes in {ex_time:.4f} seconds.'))
     def _init_nodes(self):
         rclpy.init()
+        # init parameter manager
+        self.param_manager = ParameterManager('controller_server')
+        self.nodes['param_manager'] = self.param_manager
         # init parameter manager
         self.param_manager = ParameterManager('controller_server')
         self.nodes['param_manager'] = self.param_manager
