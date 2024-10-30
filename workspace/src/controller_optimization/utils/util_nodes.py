@@ -157,7 +157,8 @@ class OdomSubscriber(Node):
     def get_data_between(self, start_time_ns, end_time_ns) -> Tuple[np.ndarray, np.ndarray]:
         self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
         # Assert that the deques are the same length
-        assert len(self.odom_xy) == len(self.odom_t_ns), 'Length of odom_xy and odom_t_ns should be the same'
+        assert len(self.odom_xy) == len(
+            self.odom_t_ns), 'Length of odom_xy and odom_t_ns should be the same'
 
         # Convert deques to NumPy arrays for efficient slicing
         odom_xy = np.array(self.odom_xy)
@@ -169,36 +170,17 @@ class OdomSubscriber(Node):
         # Apply the mask to get the desired values
         xy_values = odom_xy[mask]
         t_values = odom_t_ns[mask] - start_time_ns  # Wrap t to match desired ndarray shape
+        t_values = t_values / 1e9  # Convert nanoseconds to seconds
 
         # Assert that the lengths of the arrays are the same after operation
-        assert len(xy_values) == len(t_values), 'Length of xy_values and t_values should be the same'
+        assert len(xy_values) == len(
+            t_values), 'Length of xy_values and t_values should be the same'
 
         # Empty the deques
         self.odom_xy.clear()
         self.odom_t_ns.clear()
 
         return xy_values, t_values
-
-    # def get_data_between(self, start_time_ns, end_time_ns) -> Tuple[np.ndarray, np.ndarray]:
-    #     self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
-    #     xy_values = []
-    #     t_values = []
-
-    #     # theoretically deque is thread-safe, but we are not sure about it
-    #     for _ in range(len(self.odom_t_ns)):
-    #         xy = self.odom_xy.popleft()
-    #         t = self.odom_t_ns.popleft()
-
-    #         if start_time_ns <= t <= end_time_ns:
-    #             xy_values.append(xy)
-    #             t_values.append(t - start_time_ns)  # Wrap t to match desired ndarray shape (0, 1))
-
-    #     # check
-    #     assert len(xy_values) == len(
-    #         t_values), 'Length of xy_values and t_values should be the same'
-
-    #     # Convert lists to NumPy arrays
-    #     return np.array(xy_values), np.array(t_values)
 
 
 class CmdVelSubscriber(Node):
@@ -223,31 +205,6 @@ class CmdVelSubscriber(Node):
         self.cmd_vel_xy.append([msg.linear.x, msg.linear.y])
         self.cmd_vel_omega.append(msg.angular.z)
 
-    # def get_data_between(self, start_time_ns, end_time_ns) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    #     self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
-    #     xy_values = []
-    #     omega_values = []
-    #     t_values = []
-
-    #     # theoretically deque is thread-safe, but we are not sure about it
-    #     for _ in range(len(self.cmd_vel_t_ns)):
-    #         xy = self.cmd_vel_xy.popleft()
-    #         omega = self.cmd_vel_omega.popleft()
-    #         t = self.cmd_vel_t_ns.popleft()
-
-    #         if start_time_ns <= t <= end_time_ns:
-    #             xy_values.append(xy)
-    #             omega_values.append(omega)
-    #             t_values.append(t - start_time_ns)
-
-    #     # check
-    #     assert len(xy_values) == len(
-    #         t_values), 'Length of xy_values and t_values should be the same'
-    #     assert len(omega_values) == len(
-    #         t_values), 'Length of xy_values and omega_values should be the same'
-
-    #     return np.array(xy_values), np.array(omega_values), np.array(t_values)
-
     def get_data_between(self, start_time_ns, end_time_ns) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
         # Assert that the deques are the same length
@@ -266,6 +223,7 @@ class CmdVelSubscriber(Node):
         xy_values = cmd_vel_xy[mask]
         omega_values = cmd_vel_omega[mask]
         t_values = cmd_vel_t_ns[mask] - start_time_ns  # Wrap t to match desired ndarray shape
+        t_values = t_values / 1e9  # Convert nanoseconds to seconds
 
         # Assert that the lengths of the arrays are the same after operation
         assert len(xy_values) == len(t_values) == len(omega_values), \
@@ -277,6 +235,7 @@ class CmdVelSubscriber(Node):
         self.cmd_vel_t_ns.clear()
 
         return xy_values, omega_values, t_values
+
 
 class MPPICriticSubscriber(Node):
     def __init__(self, topic: str):
@@ -318,8 +277,11 @@ class MPPICriticSubscriber(Node):
         mask = (critic_scores_t_ns >= start_time_ns) & (critic_scores_t_ns <= end_time_ns)
 
         # Apply the mask to get the desired values
-        critic_score_values_dict = {critic: scores[mask] for critic, scores in critic_scores.items()}
-        t_values = critic_scores_t_ns[mask] - start_time_ns  # Wrap t to match desired ndarray shape
+        critic_score_values_dict = {critic: scores[mask]
+                                    for critic, scores in critic_scores.items()}
+        # Wrap t to match desired ndarray shape
+        t_values = critic_scores_t_ns[mask] - start_time_ns
+        t_values = t_values / 1e9  # Convert nanoseconds to seconds
 
         # Assert that the lengths of the arrays are the same after operation
         for critic in critic_score_values_dict:
@@ -358,6 +320,7 @@ class MPPICriticSubscriber(Node):
 
             t_values.append(t - start_time_ns)
 
+        t_values = t_values / 1e9  # Convert nanoseconds to seconds
         for critic in critic_score_values_dict:
             assert len(critic_score_values_dict[critic]) == len(t_values), \
                 'Length of critic scores and t_values should be the same'

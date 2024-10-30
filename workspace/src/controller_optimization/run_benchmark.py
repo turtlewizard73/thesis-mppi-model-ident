@@ -67,16 +67,15 @@ def main():
 
     if args.plot_only is False:
         controller_benchmark.launch_nodes()
-        controller_benchmark.start_data_collection()
-        controller_benchmark.run_benchmark()
-        controller_benchmark.stop_data_collection()
-        res = controller_benchmark.results[0]
+
+        success, results = controller_benchmark.run_benchmark(store_results=False)
+        res = results[0]
         controller_benchmark.save_result(res)
         controller_benchmark.stop_nodes()
 
         fig_result = controller_benchmark.plot_result(res)
         metric = controller_benchmark.calculate_metric(res)
-        fig_metric= controller_benchmark.plot_metric(res, metric)
+        fig_metric = controller_benchmark.plot_metric(res, metric)
         plt.show()
     else:
         res = controller_benchmark.load_last_result()

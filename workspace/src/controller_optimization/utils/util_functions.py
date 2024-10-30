@@ -49,8 +49,8 @@ def flatten_dict(d: dict, parent_key: str = '', sep: str = '.'):
     return flat_data
 
 
-def reformat_yaml(input_file: str, output_file: str):
-    with open(input_file, 'r', encoding='utf-8') as file:
+def reformat_yaml(input_path: str, output_path: str):
+    with open(input_path, 'r', encoding='utf-8') as file:
         data = yaml.safe_load(file)
 
     flat_data = {}
@@ -60,10 +60,10 @@ def reformat_yaml(input_file: str, output_file: str):
         flat_data.update({
             node_name: {
                 'ros__parameters': flatten_dict(ros_parameters)
-                }
-            })
+            }
+        })
 
-    with open(output_file, 'w', encoding='utf-8') as file:
+    with open(output_path, 'w', encoding='utf-8') as file:
         file.write(yaml.dump(flat_data, default_flow_style=None))
 
 
