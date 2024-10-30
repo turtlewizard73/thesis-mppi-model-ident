@@ -46,3 +46,8 @@ https://www.youtube.com/watch?v=xRhPwQdNMss
 metrikák ból egy függvény ugye hogy közel milyen jó lenne pl
 (sebesség optimális - mért) * súly .....
 aztán kézzel irányítani -> majd abcd súlyokkal görbét illeszteni
+
+
+## 2024. 10. 30.
+- setting params programatically from benchmark
+- https://roboticsbackend.com/rclpy-params-tutorial-get-set-ros2-params-with-python/
