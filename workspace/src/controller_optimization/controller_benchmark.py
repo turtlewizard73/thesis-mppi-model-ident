@@ -412,7 +412,12 @@ class ControllerBenchmark:
 
         stamp = time.strftime(self.params['timestamp_format'])
         filename = f'controller_benchmark_result_{stamp}.pickle'
-        with open(os.path.join(self.RESULTS_PATH, sub_folder, filename), 'wb+') as f:
+        save_path = os.path.join(ControllerBenchmark.RESULTS_PATH, sub_folder)
+        if os.path.isdir(save_path) is False:
+            self.logger.info(f'Creating directory: {save_path}')
+            os.makedirs(save_path)
+
+        with open(os.path.join(save_path, filename), 'wb+') as f:
             pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
         self.logger.info(f'Written results to: {filename}')
 
