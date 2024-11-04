@@ -22,7 +22,7 @@ def generate_launch_description():
     namespace = ''
     use_sim_time = 'true'
     autostart = 'true'
-    use_respawn = 'false'
+    use_respawn = 'False'
 
     rviz_config_file = os.path.join(this_package_dir, 'nav2_default_view.rviz')
     world = os.path.join(this_package_dir, 'world_only.world')
