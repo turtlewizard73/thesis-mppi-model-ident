@@ -41,6 +41,8 @@ def flatten_dict(d: dict, parent_key: str = '', sep: str = '.'):
     for key, value in d.items():
         if 'qos' in key:
             continue
+        if 'qos' in key:
+            continue
         new_key = f'{parent_key}{sep}{key}' if parent_key else key
         if isinstance(value, dict):
             flat_data.update(flatten_dict(d=value, parent_key=new_key, sep=sep))
