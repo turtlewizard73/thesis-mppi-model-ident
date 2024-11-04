@@ -1,7 +1,5 @@
 # Builtin modules
 import os
-from distutils.util import strtobool
-# from memory_profiler import profile
 
 # ROS modules
 from launch import LaunchDescription
@@ -15,30 +13,23 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
-    this_package_dir = get_package_share_directory('controller_benchmark')
+    this_package_dir = get_package_share_directory('controller_launch')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
+    gazebo_dir = get_package_share_directory('gazebo_ros')
 
-    # nav_config_file = LaunchConfiguration('use_basic_config')
-    # use_basic_config = bool(strtobool(use_basic_config))
     gui = LaunchConfiguration('gui')
 
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
 
-    # nav_config_file = 'nav2_params_mppi.yaml' if use_basic_config is False else 'nav2_params.yaml'
-    # nav_config = os.path.join(this_package_dir, 'default_burger_params.yaml')
     nav_config = os.path.join(this_package_dir, 'default_nav2_params.yaml')
 
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
-    # lifecycle_nodes = ['map_server', 'planner_server']
-    # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
     world = os.path.join(this_package_dir, 'empty_world.world')
 
     urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
-    # urdf = os.path.join(this_package_dir, 'turtlebot3_burger.urdf')
+
     with open(urdf, 'r') as urdf_file:
         robot_description = urdf_file.read()
-
-    gazebo_dir = get_package_share_directory('gazebo_ros')
 
     # -------------------------------------------------------------------------------------
     # Nodes, processes:                         -> task                 - config file
