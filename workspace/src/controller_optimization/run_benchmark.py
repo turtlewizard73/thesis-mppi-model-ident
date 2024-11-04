@@ -22,9 +22,6 @@ def main():
     parser.add_argument(
         '-r', '--process_results', action='store_true', default=False,
         help='Only process results, no test run.')
-    parser.add_argument(
-        '-b', '--batch', action='store_true', default=False,
-        help='Run in batch mode.')
     args = parser.parse_args()
 
     # LOGGING
@@ -67,41 +64,6 @@ def main():
         config_path=os.path.join(
             BASE_PATH, 'config/controller_benchmark_config.yaml')
     )
-
-    if args.batch is True:
-        from itertools import product
-        import numpy as np
-
-        controller_benchmark.launch_nodes()
-        # Generate a list of weights from 1-100
-        n = 10
-        weights = np.linspace(1.0, 100.0, n)
-        critics = ['ConstraintCritic', 'GoalCritic', 'PreferForwardCritic',
-                   'CostCritic', 'PathAlignCritic', 'PathFollowCritic', 'PathAngleCritic']
-
-        # weights = [1.0, 10.0, 200.0]
-        critics = ['CostCritic', 'PathFollowCritic']
-
-        parameter_space = list(product(weights, repeat=len(critics)))
-        print(f'Possible parameter combinations: {len(parameter_space)}')
-
-        i = 0
-        results: list[dict[int, bool]] = []
-        critic_weights = []
-        for weights in parameter_space:
-            params = {critic: weight for critic, weight in zip(critics, weights)}
-            critic_weights.append(params)
-
-            success, res = controller_benchmark.run_benchmark(
-                parameters=params, store_results=False)
-            msg = 'successful' if success else 'unsuccessful'
-            print(f'Iteration {i} was {msg}. with weights {weights}')
-
-            controller_benchmark.save_result(res[0], sub_folder='paramspace0')
-
-            results.append({i: success})
-            i += 1
-        exit(0)
 
     if args.plot_only is False:
         controller_benchmark.launch_nodes()

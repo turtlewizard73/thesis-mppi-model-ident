@@ -30,11 +30,13 @@ from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
 from utils.controller_results import ControllerResult
 from utils.controller_metrics import ControllerMetric
+from utils.controller_parameters import MPPIControllerParameters
 from utils.parameter_manager import ParameterManager
 
 
 @dataclass
 class MapData:
+    """MapData dataclass."""
     name: str
     yaml_path: str
     start: PoseStamped = PoseStamped()
@@ -45,21 +47,26 @@ class MapData:
 
 class ControllerBenchmark:
     BASE_PATH = os.path.dirname(__file__)
-    CONFIG_PATH = os.path.join(BASE_PATH, 'config')
     RESULTS_PATH = os.path.join(BASE_PATH, 'results')
     METRICS_PATH = os.path.join(BASE_PATH, 'metrics')
     COSTMAP_RESOLUTION = 0.05  # TODO: get from costmap
 
-    def __init__(self, logger, config_path: str, base_path: str = None):
-        if base_path is not None:
+    def __init__(
+            self, logger, config_path: str, base_path: str = '') -> None:
+        if base_path != '':
             ControllerBenchmark.BASE_PATH = base_path
+        # create directories
+        if os.path.isdir(ControllerBenchmark.RESULTS_PATH) is False:
+            os.makedirs(ControllerBenchmark.RESULTS_PATH)
+        if os.path.isdir(ControllerBenchmark.METRICS_PATH) is False:
+            os.makedirs(ControllerBenchmark.METRICS_PATH)
 
         self.logger = logger
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
+
         self.config_path = config_path
         self.params: Dict = {}
-        self.default_controller_params: Dict = {}
         self.load_config()
 
         self.map_data: Dict[str, MapData] = {}
@@ -72,12 +79,6 @@ class ControllerBenchmark:
 
         self.nav = nav2.BasicNavigator()
         self.nodes_active = False
-
-        # create directories
-        if os.path.isdir(ControllerBenchmark.RESULTS_PATH) is False:
-            os.makedirs(ControllerBenchmark.RESULTS_PATH)
-        if os.path.isdir(ControllerBenchmark.METRICS_PATH) is False:
-            os.makedirs(ControllerBenchmark.METRICS_PATH)
 
         self.results: List[ControllerResult] = []
 
@@ -101,24 +102,16 @@ class ControllerBenchmark:
             self.params['robot_name'] = data['robot_name']
             self.params['planner'] = data['planner']
             self.params['controller'] = data['controller']
-            self.params['default_controller_params'] = data['default_controller_params']
             self.params['cmd_vel_topic'] = data['cmd_vel_topic']
             self.params['odom_topic'] = data['odom_topic']
             self.params['costmap_topic'] = data['costmap_topic']
             self.params['mppi_critic_topic'] = data['mppi_critic_topic']
 
-        controller_params_path = os.path.join(
-            ControllerBenchmark.BASE_PATH, self.params['default_controller_params'])
         self.logger.debug(f'BASE_PATH: {ControllerBenchmark.BASE_PATH}')
         self.logger.debug(f'Controller params file: {controller_params_path}')
-        with open(controller_params_path, 'r', encoding='utf-8') as file:
-            data = yaml.safe_load(file)
-            self.default_controller_params = data['/controller_server']['ros__parameters']
 
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Config: \n {pformat(self.params)}')
-            self.logger.debug(
-                f'Default controller params: \n {pformat(self.default_controller_params)}')
 
     @timing_decorator(
         lambda self: self.logger.info('Loading maps from...'),
