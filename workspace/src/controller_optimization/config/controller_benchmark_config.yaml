@@ -2,7 +2,7 @@ timestamp_format: '%Y-%m-%d-%H-%M'
 robot_name: turtlebot3_waffle
 planner: GridBased
 controller: FollowPathMPPI
-default_controller_params: config/controller_server_params_reformat/default_mppi_params_reformatted.yaml
+# default_controller_params: config/controller_server_params_reformat/default_mppi_params_reformatted.yaml
 cmd_vel_topic: /cmd_vel
 odom_topic: /odom
 costmap_topic: /local_costmap/costmap

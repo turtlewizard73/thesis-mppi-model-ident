@@ -47,7 +47,18 @@ metrikák ból egy függvény ugye hogy közel milyen jó lenne pl
 (sebesség optimális - mért) * súly .....
 aztán kézzel irányítani -> majd abcd súlyokkal görbét illeszteni
 
+!!!!!!!!!!
+rárakni valami pluszba csak a local costmapre, hogy az útról eltávolodás és a célhoz közelebb jutás is jól belegyen állítva
+
 
 ## 2024. 10. 30.
 - setting params programatically from benchmark
 - https://roboticsbackend.com/rclpy-params-tutorial-get-set-ros2-params-with-python/
+
+## 2024. 11 04.
+- grid search nyilván nem jó majd leírni miért sok
+- ugye random is necco, elindulva optimálról átscalelni
+- timeout belerakás
+- mppi readmi alapján kicsit okosított nem teljesen random search
+- local costmapre plusz akadályt rakni, hogy az útról eltávolodás és a célhoz közelebb jutás is jól belegyen állítva
+- random search: https://medium.com/@hammad.ai/tuning-model-hyperparameters-with-random-search-f4c1cc88f528
