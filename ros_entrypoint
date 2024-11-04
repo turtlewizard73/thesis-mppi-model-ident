@@ -38,7 +38,7 @@ alias rosbuild="cd ~/thesis-mppi-model-ident/workspace &&
     colcon build --symlink-install --cmake-args ' -DCMAKE_EXPORT_COMPILE_COMMANDS=ON' '-DCMAKE_BUILD_TYPE=Debug' --packages-select controller_launch controller_benchmark nav2_mppi_controller"
 alias clear_rosbuild="rm -rf /home/turtlewizard/thesis-mppi-model-ident/workspace/build/controller* /home/turtlewizard/thesis-mppi-model-ident/workspace/install/controller*"
 alias copy_install="rsync -avh --delete -e ssh ~/thesis-mppi-model-ident/workspace/install $TURTLE_HOME_IP:~/repos/thesis-mppi-model-ident/workspace/"
-alias bringup='ros2 launch controller_benchmark controller_benchmark_bringup.launch.py'
+alias bringup='ros2 launch controller_launch bringup_controller_benchmark.launch.py'
 alias run_benchmark='python3 /home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/run_benchmark.py'
 
 # gazebo first run
