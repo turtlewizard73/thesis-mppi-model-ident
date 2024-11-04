@@ -348,7 +348,7 @@ class CostmapSubscriber(Node):
         self.costmaps_data.append(costmap_data)
 
         # get avarage cost of robot at the center of the costmap
-        center
+        # center
 
     def get_msgs(self, start_time: RosTime, end_time: RosTime):
         pass
