@@ -1,0 +1,14 @@
+/controller_server:
+  ros__parameters:
+    FollowPathMPPI.ConstraintCritic.cost_power: 10
+    FollowPathMPPI.ConstraintCritic.cost_weight: 10.0
+    FollowPathMPPI.ConstraintCritic.enabled: true
+    FollowPathMPPI.CostCritic.collision_cost: 1000000.0
+    FollowPathMPPI.CostCritic.consider_footprint: true
+    FollowPathMPPI.CostCritic.cost_power: 10
+    FollowPathMPPI.CostCritic.cost_weight: 3.81
+    FollowPathMPPI.CostCritic.critical_cost: 300.0
+    FollowPathMPPI.CostCritic.enabled: true
+    FollowPathMPPI.PathAlignCritic.cost_power: 10
+    FollowPathMPPI.PathAlignCritic.cost_weight: 70.0
+    # FollowPathMPPI.CostCritic.inflation_layer_name: ''

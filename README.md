@@ -97,3 +97,12 @@ Performance test (communication - dds)
 ### pdf
 - some tool for planner banchmarking: https://arxiv.org/pdf/2105.01777
 - rms jerk: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3470860/
+
+### RMS jerk
+RMSJ is generally preferred over average jerk for the following reasons:
+
+  Sensitivity to Large Jerks: RMSJ penalizes high jerk values more due to squaring. Average jerk, on the other hand, may underrepresent these values, particularly if there are small, intermittent spikes in jerk that might affect comfort or stability in control.
+
+  Smoothness Benchmarking: Controllers aiming for smooth trajectories benefit from using RMSJ, as it emphasizes jerk variability more effectively, providing a more robust measure of smoothness.
+
+  Signal Noise Robustness: RMSJ reduces the influence of small fluctuations in jerk, making it less susceptible to noise or minor variations that don’t contribute significantly to the movement smoothness.

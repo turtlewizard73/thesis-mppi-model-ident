@@ -2,6 +2,8 @@
 
 # Common modules
 import time
+# import yaml
+import yaml
 import numpy as np
 from functools import wraps
 from scipy.spatial.transform import Rotation
@@ -34,6 +36,37 @@ def timing_decorator(on_start, on_end):
     return decorator
 
 
+def flatten_dict(d: dict, parent_key: str = '', sep: str = '.'):
+    flat_data = {}
+    for key, value in d.items():
+        if 'qos' in key:
+            continue
+        new_key = f'{parent_key}{sep}{key}' if parent_key else key
+        if isinstance(value, dict):
+            flat_data.update(flatten_dict(d=value, parent_key=new_key, sep=sep))
+        else:
+            flat_data[new_key] = value
+    return flat_data
+
+
+def reformat_yaml(input_path: str, output_path: str):
+    with open(input_path, 'r', encoding='utf-8') as file:
+        data = yaml.safe_load(file)
+
+    flat_data = {}
+    for node_name, node_params in data.items():
+        ros_parameters = node_params['ros__parameters']
+        node_name = node_name if node_name.startswith("/") else f"/{node_name}"
+        flat_data.update({
+            node_name: {
+                'ros__parameters': flatten_dict(ros_parameters)
+            }
+        })
+
+    with open(output_path, 'w', encoding='utf-8') as file:
+        file.write(yaml.dump(flat_data, default_flow_style=None))
+
+
 def yaw2quat(yaw: float) -> Quaternion:
     q = Rotation.from_euler('XYZ', [0., 0., yaw], degrees=False).as_quat()
     quat = Quaternion()
@@ -47,7 +80,7 @@ def yaw2quat(yaw: float) -> Quaternion:
 def newton_diff(y: np.ndarray, dt: float) -> np.ndarray:
     derivative = np.zeros_like(y)
     # Central differences
-    derivative[2:-2] = (-y[4:] + 8*y[3:-1] - 8*y[1:-3] + y[0:-4]) / (12 * dt)
+    derivative[2:-2] = (-y[4:] + 8 * y[3:-1] - 8 * y[1:-3] + y[0:-4]) / (12 * dt)
     # Use lower-order methods at the boundaries
     derivative[0] = (y[1] - y[0]) / dt  # Forward difference for the first point
     derivative[1] = (y[2] - y[0]) / (2 * dt)  # Central difference for the second point

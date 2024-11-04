@@ -4,7 +4,7 @@
 import logging
 import os
 import yaml
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from pprint import pformat
 from threading import Thread
 import time
@@ -30,12 +30,13 @@ from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
 from utils.controller_results import ControllerResult
 from utils.controller_metrics import ControllerMetric
+from utils.parameter_manager import ParameterManager
 
 
 @dataclass
 class MapData:
     name: str
-    path: str
+    yaml_path: str
     start: PoseStamped = PoseStamped()
     goal: PoseStamped = PoseStamped()
     resolution: float = 0.05
@@ -44,19 +45,24 @@ class MapData:
 
 class ControllerBenchmark:
     BASE_PATH = os.path.dirname(__file__)
+    CONFIG_PATH = os.path.join(BASE_PATH, 'config')
     RESULTS_PATH = os.path.join(BASE_PATH, 'results')
     METRICS_PATH = os.path.join(BASE_PATH, 'metrics')
     COSTMAP_RESOLUTION = 0.05  # TODO: get from costmap
 
-    def __init__(self, logger, config_path: str):
+    def __init__(self, logger, config_path: str, base_path: str = None):
+        if base_path is not None:
+            ControllerBenchmark.BASE_PATH = base_path
+
         self.logger = logger
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
         self.config_path = config_path
         self.params: Dict = {}
+        self.default_controller_params: Dict = {}
         self.load_config()
 
-        self.map_data: Dict = {}
+        self.map_data: Dict[str, MapData] = {}
         self.load_maps()
 
         self.nodes: Dict = {}
@@ -95,13 +101,24 @@ class ControllerBenchmark:
             self.params['robot_name'] = data['robot_name']
             self.params['planner'] = data['planner']
             self.params['controller'] = data['controller']
+            self.params['default_controller_params'] = data['default_controller_params']
             self.params['cmd_vel_topic'] = data['cmd_vel_topic']
             self.params['odom_topic'] = data['odom_topic']
             self.params['costmap_topic'] = data['costmap_topic']
             self.params['mppi_critic_topic'] = data['mppi_critic_topic']
 
+        controller_params_path = os.path.join(
+            ControllerBenchmark.BASE_PATH, self.params['default_controller_params'])
+        self.logger.debug(f'BASE_PATH: {ControllerBenchmark.BASE_PATH}')
+        self.logger.debug(f'Controller params file: {controller_params_path}')
+        with open(controller_params_path, 'r', encoding='utf-8') as file:
+            data = yaml.safe_load(file)
+            self.default_controller_params = data['/controller_server']['ros__parameters']
+
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Config: \n {pformat(self.params)}')
+            self.logger.debug(
+                f'Default controller params: \n {pformat(self.default_controller_params)}')
 
     @timing_decorator(
         lambda self: self.logger.info('Loading maps from...'),
@@ -110,29 +127,30 @@ class ControllerBenchmark:
         # load information from main config file
         with open(self.config_path, 'r', encoding='utf-8') as file:
             data = yaml.safe_load(file)
-            for map_ in data.get('maps'):
+            for map_name in data.get('maps'):
 
                 start = PoseStamped()
                 start.header.frame_id = 'map'
-                start.pose.position.x = data.get(map_)['start_pose']['x']
-                start.pose.position.y = data.get(map_)['start_pose']['y']
-                yaw = data.get(map_)['start_pose']['yaw']
+                start.pose.position.x = data.get(map_name)['start_pose']['x']
+                start.pose.position.y = data.get(map_name)['start_pose']['y']
+                yaw = data.get(map_name)['start_pose']['yaw']
                 start.pose.orientation = yaw2quat(yaw)
 
                 goal = PoseStamped()
                 goal.header.frame_id = 'map'
-                goal.pose.position.x = data.get(map_)['goal_pose']['x']
-                goal.pose.position.y = data.get(map_)['goal_pose']['y']
-                yaw = data.get(map_)['goal_pose']['yaw']
+                goal.pose.position.x = data.get(map_name)['goal_pose']['x']
+                goal.pose.position.y = data.get(map_name)['goal_pose']['y']
+                yaw = data.get(map_name)['goal_pose']['yaw']
                 goal.pose.orientation = yaw2quat(yaw)
 
                 mapdata = MapData(
-                    name=map_,
-                    path=os.path.join(ControllerBenchmark.BASE_PATH, data.get(map_)['path']),
+                    name=map_name,
+                    yaml_path=os.path.join(
+                        ControllerBenchmark.BASE_PATH, data.get(map_name)['path']),
                     start=start,
                     goal=goal)
 
-                self.map_data[map_] = mapdata
+                self.map_data[map_name] = mapdata
 
         # load information from map config files
         # for map_ in self.map_data.keys():
@@ -146,7 +164,7 @@ class ControllerBenchmark:
 
         for map_name, map_data in self.map_data.items():
             map_config_path = os.path.join(
-                ControllerBenchmark.BASE_PATH, map_data.path)
+                ControllerBenchmark.BASE_PATH, map_data.yaml_path)
             with open(map_config_path, 'r', encoding='utf-8') as file:
                 map_config = yaml.safe_load(file)
                 self.map_data[map_name].resolution = map_config['resolution']
@@ -161,7 +179,9 @@ class ControllerBenchmark:
         lambda self, ex_time: self.logger.info(f'Initialized nodes in {ex_time:.4f} seconds.'))
     def _init_nodes(self):
         rclpy.init()
-
+        # init parameter manager
+        self.param_manager = ParameterManager('controller_server')
+        self.nodes['param_manager'] = self.param_manager
         # init marker server
         self.marker_server = util_nodes.MarkerServer()
         self.nodes['marker_server'] = self.marker_server
@@ -239,82 +259,120 @@ class ControllerBenchmark:
     @timing_decorator(
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
-    def run_benchmark(self):
-        for map_ in self.map_data.keys():
-            self.logger.info(f'Changing map to: {map_}')
-            self.nav.changeMap(os.path.join(
-                ControllerBenchmark.BASE_PATH, self.map_data[map_].path))
-            self.nav.clearAllCostmaps()
-            time.sleep(0.5)
+    def run_benchmark(self, parameters: dict = {}, store_results: bool = True) -> Tuple[bool, List[ControllerResult]]:
+        try:
+            # set parameters to controller server
+            if parameters == {}:
+                parameters = self.default_controller_params
+            self.param_manager.set_parameters(parameters)
 
-            # getting start and goal pose
-            start: PoseStamped = self.map_data[map_].start
-            self.marker_server.publish_markers([start], 'start', (1., 0., 0.))
-            goal: PoseStamped = self.map_data[map_].goal
-            self.marker_server.publish_markers([goal], 'goal', (0., 1., 0.))
+            # check if nodes are active
+            # TODO
 
-            # resetting world and setting robot pose
-            self.gazebo_interface.reset_world()
-            self.gazebo_interface.set_entity_state(self.params['robot_name'], start.pose)
-            self.nav.setInitialPose(start)
-            self.nav.clearAllCostmaps()
-            time.sleep(0.5)
+            # start data collection
+            self.start_data_collection()
 
-            # generating global plan
-            planner = self.params['planner']
-            self.logger.info(f'Getting global plan for {map_} with planner: {planner}.')
-            global_plan = self.nav.getPath(start, goal, planner, use_start=True)
-            if global_plan is None:
-                self.logger.error('Failed to get global plan.')
-                continue
+            # run benchmark for every map
+            results: List[ControllerResult] = []
+            for map_name, map_ in self.map_data.items():
+                # new_map = os.path.join(
+                #     ControllerBenchmark.BASE_PATH, map_.yaml_path)
+                self.logger.info(f'Changing map to: {map_.yaml_path}')
+                self.nav.changeMap(map_.yaml_path)
+                self.nav.clearAllCostmaps()
+                time.sleep(0.5)
 
-            # running controller
-            controller = self.params['controller']
-            self.logger.info(
-                f'___ Starting controller: {controller}, on map: {map_}. ___')
-            start_time: rclpy.clock.Time = rclpy.clock.Clock().now()  # not simulation time
-            self.nav.followPath(global_plan, controller_id=controller)
-            while not self.nav.isTaskComplete():
-                time.sleep(1)
-            end_time: rclpy.clock.Time = rclpy.clock.Clock().now()
-            time_elapsed: rclpy.clock.Duration = end_time - start_time
-            self.logger.info(
-                f'___ Controller {controller} on map {map_} finished'
-                f' in {time_elapsed.nanoseconds * 1e-9} [s]. ___')
+                # getting start and goal pose
+                start: PoseStamped = map_.start
+                self.marker_server.publish_markers([start], 'start', (1., 0., 0.))
+                goal: PoseStamped = map_.goal
+                self.marker_server.publish_markers([goal], 'goal', (0., 1., 0.))
 
-            # collecting results
-            self.logger.debug(
-                f'Collecting results between {start_time.nanoseconds * 1e-9}'
-                f' and {end_time.nanoseconds * 1e-9}.')
+                # resetting world and setting robot pose
+                self.gazebo_interface.reset_world()
+                self.gazebo_interface.set_entity_state(self.params['robot_name'], start.pose)
+                self.nav.setInitialPose(start)
+                self.nav.clearAllCostmaps()
+                time.sleep(0.5)
 
-            nav_result = True if self.nav.getResult() == nav2.TaskResult.SUCCEEDED else False
-            path_xy = np.array([
-                (pstamped.pose.position.x, pstamped.pose.position.y) for pstamped in global_plan.poses])
-            odom_xy, odom_t = self.odom_sub.get_data_between(
-                start_time.nanoseconds, end_time.nanoseconds)
-            cmd_vel_xy, cmd_vel_omega, cmd_vel_t = self.cmd_vel_sub.get_data_between(
-                start_time.nanoseconds, end_time.nanoseconds)
-            critic_scores, critic_scores_t = self.mppi_critic_sub.get_data_between(
-                start_time.nanoseconds, end_time.nanoseconds)
+                # generating global plan
+                planner = self.params['planner']
+                self.logger.info(f'Getting global plan for {map_name} with planner: {planner}.')
+                global_plan = self.nav.getPath(start, goal, planner, use_start=True)
+                if global_plan is None:
+                    self.logger.error('Failed to get global plan.')
+                    continue
 
-            result = ControllerResult(
-                controller_name=controller,
-                map_name=map_,
-                start_time=start_time.nanoseconds,
-                time_elapsed=time_elapsed.nanoseconds,
-                success=nav_result,
-                path_xy=path_xy,
-                odom_xy=odom_xy,
-                odom_t=odom_t,
-                cmd_vel_xy=cmd_vel_xy,
-                cmd_vel_omega=cmd_vel_omega,
-                cmd_vel_t=cmd_vel_t,
-                critic_scores=critic_scores,
-                critic_scores_t=critic_scores_t,
-                avg_costs=None
-            )
+                # running controller
+                controller = self.params['controller']
+                self.logger.info(
+                    f'___ Starting controller: {controller}, on map: {map_name}. ___')
+                start_time: rclpy.clock.Time = rclpy.clock.Clock().now()  # not simulation time
+                self.nav.followPath(global_plan, controller_id=controller)
+                while not self.nav.isTaskComplete():
+                    time.sleep(1)
+                end_time: rclpy.clock.Time = rclpy.clock.Clock().now()
+                time_elapsed: rclpy.clock.Duration = end_time - start_time
+                self.logger.info(
+                    f'___ Controller {controller} on map {map_name} finished'
+                    f' in {time_elapsed.nanoseconds * 1e-9} [s]. ___')
 
-            self.results.append(result)
+                # collecting results
+                self.logger.debug(
+                    f'Collecting results between {start_time.nanoseconds * 1e-9}'
+                    f' and {end_time.nanoseconds * 1e-9}.')
+
+                nav_result = True if self.nav.getResult() == nav2.TaskResult.SUCCEEDED else False
+                path_xy = np.array([
+                    (pstamped.pose.position.x, pstamped.pose.position.y) for pstamped in global_plan.poses])
+                odom_xy, odom_t = self.odom_sub.get_data_between(
+                    start_time.nanoseconds, end_time.nanoseconds)
+                cmd_vel_xy, cmd_vel_omega, cmd_vel_t = self.cmd_vel_sub.get_data_between(
+                    start_time.nanoseconds, end_time.nanoseconds)
+                critic_scores, critic_scores_t = self.mppi_critic_sub.get_data_between(
+                    start_time.nanoseconds, end_time.nanoseconds)
+
+                result = ControllerResult(
+                    controller_name=controller,
+                    map_name=map_name,
+                    start_time=start_time.nanoseconds,
+                    time_elapsed=time_elapsed.nanoseconds,
+                    success=nav_result,
+                    path_xy=path_xy,
+                    odom_xy=odom_xy,
+                    odom_t=odom_t,
+                    cmd_vel_xy=cmd_vel_xy,
+                    cmd_vel_omega=cmd_vel_omega,
+                    cmd_vel_t=cmd_vel_t,
+                    critic_scores=critic_scores,
+                    critic_scores_t=critic_scores_t,
+                    avg_costs=None
+                )
+
+                results.append(result)
+
+                if store_results is True:
+                    self.results.append(result)
+
+            self.stop_data_collection()
+            return True, results
+        except Exception as e:
+            self.logger.error(f'Error during benchmark: {e}')
+            self.stop_data_collection
+            return False, []
+
+    @timing_decorator(
+        lambda self: self.logger.info('Running batch...'),
+        lambda self, ex_time: self.logger.info(f'Batch finished in {ex_time:.4f} seconds.'))
+    def run_batch(self, parameters: list[dict]) -> list[dict[int, bool]]:
+        # make a list to store if the benchmark was successful
+        results: list[dict[int, bool]] = []
+
+        for i, params in enumerate(parameters):
+            success = self.run_benchmark(parameters=params, store_results=True)
+            results.append({i: success})
+
+        return results
 
     @timing_decorator(
         lambda self: self.logger.info('Calculating metric...'),
@@ -323,7 +381,7 @@ class ControllerBenchmark:
         self.logger.info(f'Calculating metric data for result: {result.map_name}.')
         dist_to_goal = np.linalg.norm(result.path_xy[-1] - result.odom_xy[-1])
 
-        dt = np.mean(result.cmd_vel_t)
+        dt = np.mean(np.diff(result.cmd_vel_t))
         acc_lin = newton_diff(result.cmd_vel_xy[:, 0], dt)
         jerk_lin = newton_diff(acc_lin, dt)
         ms_lin_jerk = np.sqrt(np.mean(jerk_lin**2))
@@ -349,12 +407,17 @@ class ControllerBenchmark:
             angular_jerks=jerk_ang,
             ms_angular_jerk=ms_ang_jerk)
 
-    def save_result(self, result: ControllerResult) -> None:
+    def save_result(self, result: ControllerResult, sub_folder: str = '') -> None:
         self.logger.info(f'Saving result: {result.map_name}.')
 
         stamp = time.strftime(self.params['timestamp_format'])
         filename = f'controller_benchmark_result_{stamp}.pickle'
-        with open(os.path.join(self.RESULTS_PATH, filename), 'wb+') as f:
+        save_path = os.path.join(ControllerBenchmark.RESULTS_PATH, sub_folder)
+        if os.path.isdir(save_path) is False:
+            self.logger.info(f'Creating directory: {save_path}')
+            os.makedirs(save_path)
+
+        with open(os.path.join(save_path, filename), 'wb+') as f:
             pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
         self.logger.info(f'Written results to: {filename}')
 
@@ -416,7 +479,7 @@ class ControllerBenchmark:
         ax_plan.set_xlabel('x [m]')
         ax_plan.set_ylabel('y [m]')
 
-        map_path = self.map_data[result.map_name].path.replace('.yaml', '.png')
+        map_path = self.map_data[result.map_name].yaml_path.replace('.yaml', '.png')
         map_resolution = self.map_data[result.map_name].resolution
         map_img = cv2.imread(os.path.join(
             ControllerBenchmark.BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
@@ -474,7 +537,7 @@ class ControllerBenchmark:
         ax_plan.set_xlabel('x [m]')
         ax_plan.set_ylabel('y [m]')
 
-        map_path = self.map_data[result.map_name].path.replace('.yaml', '.png')
+        map_path = self.map_data[result.map_name].yaml_path.replace('.yaml', '.png')
         map_resolution = self.map_data[result.map_name].resolution
         map_img = cv2.imread(os.path.join(
             ControllerBenchmark.BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
@@ -492,7 +555,7 @@ class ControllerBenchmark:
 
         plan_label = f'Plan - dist: {metric.distance_to_goal:.2f} [m]'
         ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label=plan_label, color='g')
-        time_s = metric.time_elapsed * 1e-9
+        time_s = metric.time_elapsed
         route_label = f'Route - time: {time_s:.2f} [s]'
         ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label=route_label, color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
@@ -500,7 +563,7 @@ class ControllerBenchmark:
 
         # jerk graph
         # ax_jerk.set_title('Jerk')
-        cmd_vel_t_s = result.cmd_vel_t * 1e-9
+        cmd_vel_t_s = result.cmd_vel_t
         ax_jerk.set_xlabel('Time [s]')
         ax_jerk.set_ylabel('Jerk [m/s^3], [rad/s^3]')
         label = f'Linear jerk - RMS: {metric.ms_linear_jerk:.2f} [m/s^3]'

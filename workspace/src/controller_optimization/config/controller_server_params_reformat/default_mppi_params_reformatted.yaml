@@ -1,0 +1,68 @@
+/controller_server:
+  ros__parameters:
+    FollowPathMPPI.AckermannConstraints.min_turning_r: 0.2
+    FollowPathMPPI.ConstraintCritic.cost_power: 1
+    FollowPathMPPI.ConstraintCritic.cost_weight: 4.0
+    FollowPathMPPI.ConstraintCritic.enabled: true
+    FollowPathMPPI.CostCritic.collision_cost: 1000000.0
+    FollowPathMPPI.CostCritic.consider_footprint: true
+    FollowPathMPPI.CostCritic.cost_power: 1
+    FollowPathMPPI.CostCritic.cost_weight: 3.81
+    FollowPathMPPI.CostCritic.critical_cost: 300.0
+    FollowPathMPPI.CostCritic.enabled: true
+    FollowPathMPPI.CostCritic.near_goal_distance: 1.0
+    FollowPathMPPI.GoalAngleCritic.cost_power: 1
+    FollowPathMPPI.GoalAngleCritic.cost_weight: 3.0
+    FollowPathMPPI.GoalAngleCritic.enabled: true
+    FollowPathMPPI.GoalAngleCritic.threshold_to_consider: 0.5
+    FollowPathMPPI.GoalCritic.cost_power: 1
+    FollowPathMPPI.GoalCritic.cost_weight: 5.0
+    FollowPathMPPI.GoalCritic.enabled: true
+    FollowPathMPPI.GoalCritic.threshold_to_consider: 1.4
+    FollowPathMPPI.PathAlignCritic.cost_power: 1
+    FollowPathMPPI.PathAlignCritic.cost_weight: 14.0
+    FollowPathMPPI.PathAlignCritic.enabled: true
+    FollowPathMPPI.PathAlignCritic.max_path_occupancy_ratio: 0.05
+    FollowPathMPPI.PathAlignCritic.offset_from_furthest: 20
+    FollowPathMPPI.PathAlignCritic.threshold_to_consider: 0.5
+    FollowPathMPPI.PathAlignCritic.trajectory_point_step: 3
+    FollowPathMPPI.PathAlignCritic.use_path_orientations: false
+    FollowPathMPPI.PathAngleCritic.cost_power: 1
+    FollowPathMPPI.PathAngleCritic.cost_weight: 2.0
+    FollowPathMPPI.PathAngleCritic.enabled: true
+    FollowPathMPPI.PathAngleCritic.forward_preference: true
+    FollowPathMPPI.PathAngleCritic.max_angle_to_furthest: 1.0
+    FollowPathMPPI.PathAngleCritic.offset_from_furthest: 4
+    FollowPathMPPI.PathAngleCritic.threshold_to_consider: 0.5
+    FollowPathMPPI.PathFollowCritic.cost_power: 1
+    FollowPathMPPI.PathFollowCritic.cost_weight: 5.0
+    FollowPathMPPI.PathFollowCritic.enabled: true
+    FollowPathMPPI.PathFollowCritic.offset_from_furthest: 5
+    FollowPathMPPI.PathFollowCritic.threshold_to_consider: 1.4
+    FollowPathMPPI.PreferForwardCritic.cost_power: 1
+    FollowPathMPPI.PreferForwardCritic.cost_weight: 5.0
+    FollowPathMPPI.PreferForwardCritic.enabled: true
+    FollowPathMPPI.PreferForwardCritic.threshold_to_consider: 0.5
+    FollowPathMPPI.TrajectoryVisualizer.time_step: 3
+    FollowPathMPPI.TrajectoryVisualizer.trajectory_step: 5
+    FollowPathMPPI.batch_size: 2000
+    # FollowPathMPPI.critics: [ConstraintCritic, CostCritic, GoalCritic, GoalAngleCritic,
+    #   PathAlignCritic, PathFollowCritic, PathAngleCritic, PreferForwardCritic]
+    FollowPathMPPI.gamma: 0.015
+    FollowPathMPPI.iteration_count: 1
+    FollowPathMPPI.model_dt: 0.05
+    # FollowPathMPPI.motion_model: DiffDrive
+    # FollowPathMPPI.plugin: nav2_mppi_controller::MPPIController
+    FollowPathMPPI.prune_distance: 1.7
+    FollowPathMPPI.publish_critics: true
+    FollowPathMPPI.temperature: 0.3
+    FollowPathMPPI.time_steps: 56
+    FollowPathMPPI.transform_tolerance: 0.1
+    FollowPathMPPI.visualize: false
+    FollowPathMPPI.vx_max: 0.5
+    FollowPathMPPI.vx_min: -0.35
+    FollowPathMPPI.vx_std: 0.2
+    FollowPathMPPI.vy_max: 0.5
+    FollowPathMPPI.vy_std: 0.2
+    FollowPathMPPI.wz_max: 1.9
+    FollowPathMPPI.wz_std: 0.4

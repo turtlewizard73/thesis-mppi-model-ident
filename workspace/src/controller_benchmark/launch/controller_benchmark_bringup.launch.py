@@ -25,13 +25,16 @@ def generate_launch_description():
     map_file = os.path.join(this_package_dir, '10by10_empty.yaml')
 
     # nav_config_file = 'nav2_params_mppi.yaml' if use_basic_config is False else 'nav2_params.yaml'
+    # nav_config = os.path.join(this_package_dir, 'default_burger_params.yaml')
     nav_config = os.path.join(this_package_dir, 'default_nav2_params.yaml')
 
     lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
+    # lifecycle_nodes = ['map_server', 'planner_server']
     # os.path.join(nav2_bringup_dir, 'worlds', 'world_only.model')
     world = os.path.join(this_package_dir, 'empty_world.world')
 
     urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
+    # urdf = os.path.join(this_package_dir, 'turtlebot3_burger.urdf')
     with open(urdf, 'r') as urdf_file:
         robot_description = urdf_file.read()
 

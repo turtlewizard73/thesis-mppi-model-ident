@@ -1,13 +1,14 @@
 timestamp_format: '%Y-%m-%d-%H-%M'
 robot_name: turtlebot3_waffle
 planner: GridBased
-controller: Maneuver
+controller: FollowPathMPPI
+default_controller_params: config/controller_server_params_reformat/default_mppi_params_reformatted.yaml
 cmd_vel_topic: /cmd_vel
 odom_topic: /odom
 costmap_topic: /local_costmap/costmap
 mppi_critic_topic: /mppi_critic_scores
 # maps: [corridor_empty, corridor_mid_obstacles, corridor_side_obstacles]
-maps: [corridor_mid_obstacles]
+maps: [corridor_mixed]
 corridor_empty:
   path: 'maps/corridor_empty.yaml'
   start_pose:
@@ -40,5 +41,15 @@ corridor_side_obstacles:
     yaw: 0.0
   goal_pose:
     x: 2.0
+    y: 0.0
+    yaw: 0.0
+corridor_mixed:
+  path: 'maps/corridor_mixed.yaml'
+  start_pose:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  goal_pose:
+    x: 8.25
     y: 0.0
     yaw: 0.0
