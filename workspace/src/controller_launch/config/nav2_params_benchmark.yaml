@@ -27,7 +27,6 @@ controller_server:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
-    # DWB parameters
     FollowPathMPPI:
       plugin: "nav2_mppi_controller::MPPIController"
       publish_critics: true  # custom parameter from forked nav2_mppi_controller
@@ -164,11 +163,11 @@ local_costmap:
       #     obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        footprint_clearing_enabled: false
-        subscribe_to_updates: false
         map_subscribe_transient_local: true
-        transform_tolerance: 0.0
-        map_topic: "map_local"
+        # footprint_clearing_enabled: false
+        # subscribe_to_updates: true
+        # transform_tolerance: 0.0
+        map_topic: "/map_local"
       always_send_full_costmap: true
 
 global_costmap:
@@ -188,11 +187,11 @@ global_costmap:
       #   map_subscribe_transient_local: true
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
-        footprint_clearing_enabled: false
-        subscribe_to_updates: false
         map_subscribe_transient_local: true
-        transform_tolerance: 0.0
-        map_topic: "map"
+        # footprint_clearing_enabled: false
+        # subscribe_to_updates: false
+        # transform_tolerance: 0.0
+        map_topic: "/map"
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
