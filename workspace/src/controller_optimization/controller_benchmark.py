@@ -23,6 +23,7 @@ import nav2_simple_commander.robot_navigator as nav2
 
 # ROS msg types
 from geometry_msgs.msg import PoseStamped
+from nav2_msgs.srv import LoadMap
 
 # Custom modules
 import rclpy.time
@@ -78,6 +79,7 @@ class ControllerBenchmark:
         self._init_nodes()
 
         self.nav = nav2.BasicNavigator()
+        self.override_navigator()
         self.nodes_active = False
 
         self.results: List[ControllerResult] = []
@@ -108,7 +110,6 @@ class ControllerBenchmark:
             self.params['mppi_critic_topic'] = data['mppi_critic_topic']
 
         self.logger.debug(f'BASE_PATH: {ControllerBenchmark.BASE_PATH}')
-        self.logger.debug(f'Controller params file: {controller_params_path}')
 
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Config: \n {pformat(self.params)}')
@@ -198,6 +199,28 @@ class ControllerBenchmark:
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Initialized nodes: \n {pformat(self.nodes)}')
 
+    def override_navigator(self):
+        if self.nav is None:
+            raise ValueError('Navigator not initialized.')
+
+        self.nav.change_local_map_srv = self.nav.create_client(
+            LoadMap, 'local_map_server/load_map')
+
+    def changeLocalMap(self, map_filepath):
+        """Change the current local static map in the map server."""
+        while not self.nav.change_local_map_srv.wait_for_service(timeout_sec=1.0):
+            self.nav.info('change map service not available, waiting...')
+        req = LoadMap.Request()
+        req.map_url = map_filepath
+        future = self.nav.change_local_map_srv.call_async(req)
+        rclpy.spin_until_future_complete(self.nav, future)
+        status = future.result().result
+        if status != LoadMap.Response().RESULT_SUCCESS:
+            self.nav.error('Change map request failed!')
+        else:
+            self.nav.info('Change map request was successful!')
+        return
+
     @timing_decorator(
         lambda self: self.logger.info('Launching nodes...'),
         lambda self, ex_time: self.logger.info(f'Launched nodes in {ex_time:.4f} seconds.'))
@@ -268,8 +291,10 @@ class ControllerBenchmark:
             # run benchmark for every map
             results: List[ControllerResult] = []
             for map_name, map_ in self.map_data.items():
-                # new_map = os.path.join(
-                #     ControllerBenchmark.BASE_PATH, map_.yaml_path)
+                result = ControllerResult(
+                    controller_name=self.params['controller'],
+                    map_name=map_name)
+
                 self.logger.info(f'Changing map to: {map_.yaml_path}')
                 self.nav.changeMap(map_.yaml_path)
                 self.nav.clearAllCostmaps()
@@ -325,22 +350,18 @@ class ControllerBenchmark:
                 critic_scores, critic_scores_t = self.mppi_critic_sub.get_data_between(
                     start_time.nanoseconds, end_time.nanoseconds)
 
-                result = ControllerResult(
-                    controller_name=controller,
-                    map_name=map_name,
-                    start_time=start_time.nanoseconds,
-                    time_elapsed=time_elapsed.nanoseconds,
-                    success=nav_result,
-                    path_xy=path_xy,
-                    odom_xy=odom_xy,
-                    odom_t=odom_t,
-                    cmd_vel_xy=cmd_vel_xy,
-                    cmd_vel_omega=cmd_vel_omega,
-                    cmd_vel_t=cmd_vel_t,
-                    critic_scores=critic_scores,
-                    critic_scores_t=critic_scores_t,
-                    avg_costs=None
-                )
+                result.start_time = start_time.nanoseconds,
+                result.time_elapsed = time_elapsed.nanoseconds,
+                result.success = nav_result,
+                result.path_xy = path_xy,
+                result.odom_xy = odom_xy,
+                result.odom_t = odom_t,
+                result.cmd_vel_xy = cmd_vel_xy,
+                result.cmd_vel_omega = cmd_vel_omega,
+                result.cmd_vel_t = cmd_vel_t,
+                result.critic_scores = critic_scores,
+                result.critic_scores_t = critic_scores_t,
+                result.avg_costs = None
 
                 results.append(result)
 

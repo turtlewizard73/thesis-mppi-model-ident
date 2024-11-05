@@ -19,11 +19,13 @@ def generate_launch_description():
 
     gui = LaunchConfiguration('gui')
 
-    map_file = os.path.join(this_package_dir, 'empty_map.yaml')
+    global_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
+    local_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
 
     nav_config = os.path.join(this_package_dir, 'nav2_params_benchmark.yaml')
 
-    lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
+    lifecycle_nodes = [
+        'global_map_server', 'local_map_serer' 'planner_server', 'controller_server']
     world = os.path.join(this_package_dir, 'empty_world.world')
 
     urdf = os.path.join(this_package_dir, 'turtlebot3_waffle.urdf')
@@ -115,8 +117,18 @@ def generate_launch_description():
             name='map_server',
             output='screen',
             parameters=[{'use_sim_time': True},
-                        {'yaml_filename': map_file},
+                        {'yaml_filename': global_map_file},
                         {'topic_name': 'map'},
+                        {'frame_id': 'map'}]),
+
+        Node(
+            package='nav2_map_server',
+            executable='map_server',
+            name='local_map_server',
+            output='screen',
+            parameters=[{'use_sim_time': True},
+                        {'yaml_filename': local_map_file},
+                        {'topic_name': 'map_local'},
                         {'frame_id': 'map'}]),
 
         Node(

@@ -62,3 +62,21 @@ rárakni valami pluszba csak a local costmapre, hogy az útról eltávolodás é
 - mppi readmi alapján kicsit okosított nem teljesen random search
 - local costmapre plusz akadályt rakni, hogy az útról eltávolodás és a célhoz közelebb jutás is jól belegyen állítva
 - random search: https://medium.com/@hammad.ai/tuning-model-hyperparameters-with-random-search-f4c1cc88f528
+
+
+## 2024. 11 05.
+- szóval kettő metricre leszűkítés
+  - érjen oda minél gyorsabban > elapsed time
+  - de minél kisebb coston -> static map full cost szummázva az úton
+  - ez a kettő ugyan olyan súllyal mert ugyanazon a mapon találja a meg a leggyorsabb olyan utat amin a legkisebb a cost
+- https://docs.nav2.org/commander_api/index.html
+
+
+So i have an optimization problem.
+input1: 8 weights that can be anything from 0.01 to 100 (float)
+input2: 8 power that can be anything from 1 - 10 (float)
+
+And i have a mppi controller that these inputs are fed into.
+I run the mppi controller simulating on an arbitrary map where it controls a robot from point A to point B, after the run is finsihed i have a set of calculated metrics as output.
+output1: mean squared linear jerk
+output2: sum of costs on the path
