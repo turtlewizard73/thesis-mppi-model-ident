@@ -1,0 +1,4 @@
+# Occupancy grid values
+OCCUPANCY_FREE = 0
+OCCUPANCY_UNKNOWN = -1
+OCCUPANCY_WALL = 100

@@ -11,6 +11,8 @@ class ControllerResult:
     # represent a result of a parametrized controller run on a single plan/map
     controller_name: str
     map_name: str
+    uid: str = ''  # unique identifier, could be a timestamp, id or params
+
     start_time: float = 0.0  # nanoseconds (to substract from time arrays)
     time_elapsed: float = 0.0  # nanoseconds
     success: bool = False  # if the controller reached the goal approximately
@@ -25,6 +27,7 @@ class ControllerResult:
     # TODO -> orientation - geometry_msgs/Quaternion
     #        -> x, y, z, w - float64
     path_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+    path_omega: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
 
     # odometry xy from
     # nav_msg/Odometry https://docs.ros.org/en/melodic/api/nav_msgs/html/msg/Odometry.html
@@ -76,7 +79,7 @@ class ControllerResult:
     #    -> resolution - float32
     #    -> width - uint32
     #    -> height - uint32
-    avg_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+    costmap: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
 
-    # min cost of fatal distance
-    min_cost_from_fatal: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+    # cost of every cell in the path
+    path_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))

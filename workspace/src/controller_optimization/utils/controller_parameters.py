@@ -41,7 +41,7 @@ class MPPIControllerParameters:
         search_key = 'nav2_mppi_controller::MPPIController'
         if isinstance(data, dict):
             for key, value in data.items():
-                if key == self.name:
+                if self.name != '' and key == self.name:
                     return value
 
                 if isinstance(value, dict) and value.get('plugin') == search_key:
@@ -86,10 +86,16 @@ class MPPIControllerParameters:
     def randomize_weights(
             self, distribution: str = 'uniform',
             lower_bound: float = 0.01, upper_bound: float = 100.0,
+            decimals: int = 1,
             avg=None, std_dev=None) -> None:
         """Randomizes the MPPIController parameters."""
         for critic in self.critics:
             if distribution == 'uniform':
-                critic.cost_weight = np.random.uniform(lower_bound, upper_bound)
+                cost_weight = np.random.uniform(lower_bound, upper_bound)
             elif distribution == 'normal' and avg is not None and std_dev is not None:
-                critic.cost_weight = np.clip(np.random.normal(avg, std_dev), lower_bound, upper_bound)
+                cost_weight = np.clip(np.random.normal(
+                    avg, std_dev), lower_bound, upper_bound)
+            else:
+                raise ValueError('Unsupported distribution or missing parameters.')
+
+            critic.cost_weight = np.round(cost_weight, decimals)

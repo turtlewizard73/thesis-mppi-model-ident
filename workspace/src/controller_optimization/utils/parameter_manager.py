@@ -64,9 +64,10 @@ class ParameterManager(Node):
         rclpy.spin_until_future_complete(self, future)
 
         if future.result() is not None:
+            self.get_logger().info('SetParameters was successful!')
             return all(future.result().results)
         else:
-            self.get_logger().error('Failed to set parameters')
+            self.get_logger().error('SetParameters failed!')
             return False
 
 # example usage

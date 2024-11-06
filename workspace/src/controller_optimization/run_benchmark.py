@@ -1,12 +1,10 @@
 #! /usr/bin/env python3
 
-# Common modules
-import argparse
-import logging
 import os
-from time import strftime
+import numpy as np
 import matplotlib.pyplot as plt
 from controller_benchmark import ControllerBenchmark
+from utils.util_functions import setup_run
 from utils.controller_results import ControllerResult
 from utils.controller_parameters import MPPIControllerParameters
 
@@ -15,48 +13,17 @@ LAUNCH_PATH = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controll
 global logger, controller_benchmark
 
 
-def setup(logger_name: str = 'ControllerBenchmark') -> logging.Logger:
-    global logger
-
-    parser = argparse.ArgumentParser(description='Run controller benchmark.')
-    parser.add_argument(
-        '-d', '--debug', action='store_true', default=False,
-        help='Run in debug mode.')
-    args = parser.parse_args()
-
-    # LOGGING
-    logging_level = logging.DEBUG if args.debug is True else logging.INFO
-    logger = logging.getLogger('ControllerBenchmark')
-    logger.setLevel(logging_level)
-
-    # create console handler
-    ch = logging.StreamHandler()
-    ch.setLevel(logging_level)
-    # create file handler
-    stamp = strftime('%Y-%m-%d-%H-%M-%S')
-    log_file = os.path.join(BASE_PATH, 'logs', f'controller_benchmark_{stamp}.log')
-    fh = logging.FileHandler(
-        filename=log_file,
-        mode='w',
-        encoding='utf-8')
-    fh.setLevel(logging_level)
-
-    # create formatter
-    formatter = logging.Formatter('[%(levelname)s] [%(asctime)s] [%(name)s] %(message)s')
-    ch.setFormatter(formatter)
-    fh.setFormatter(formatter)
-
-    # add ch and fh to logger
-    logger.addHandler(ch)
-    logger.addHandler(fh)
-
-
 def test_benchmark():
     global controller_benchmark, logger
     controller_benchmark.launch_nodes()
+    res, msg = controller_benchmark.check_launch_nodes_active()
+    if not res:
+        logger.error(f"Failed to launch nodes: {msg}")
+        return
+
     result: ControllerResult = controller_benchmark.run_benchmark()
     logger.info("____________________")
-    logger.info(f"Benchmark result: {result.success}, {result.status_msg}")
+    logger.info(f"Benchmark result: {result.success}, msg: {result.status_msg}")
     controller_benchmark.save_result(result)
     controller_benchmark.stop_nodes()
 
@@ -69,14 +36,24 @@ def test_benchmark():
     plt.show()
 
 
-def plot(metric, result):
+def plot_last():
     # read last metric and result
-    pass
+    global controller_benchmark, logger
+    result = controller_benchmark.load_last_result()
+    metric = controller_benchmark.load_last_metric()
+
+    fig_result = controller_benchmark.plot_result(result)
+    fig_metric = controller_benchmark.plot_metric(result, metric)
+
+    plt.show()
 
 
 def main():
     global logger, controller_benchmark
-    setup()
+    logger = setup_run(
+        logger_name='ControllerBenchmark',
+        log_file_path=os.path.join(BASE_PATH, 'logs')
+    )
 
     default_mppi_params = MPPIControllerParameters()
     default_mppi_params.load_from_yaml(
@@ -88,8 +65,11 @@ def main():
         logger=logger,
         config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'),
         mppi_params=default_mppi_params)
+    try:
+        test_benchmark()
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt, stopping nodes.")
 
-    test_benchmark()
     exit(0)
 
 

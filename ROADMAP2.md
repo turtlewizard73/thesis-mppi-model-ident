@@ -85,3 +85,8 @@ And i have a mppi controller that these inputs are fed into.
 I run the mppi controller simulating on an arbitrary map where it controls a robot from point A to point B, after the run is finsihed i have a set of calculated metrics as output.
 output1: mean squared linear jerk
 output2: sum of costs on the path
+
+
+## 2024. 11. 06.
+- done the costmap to avg cost part
+  - fickung flipping

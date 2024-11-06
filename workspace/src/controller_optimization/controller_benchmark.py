@@ -7,6 +7,7 @@ import yaml
 from typing import Dict, List, Tuple
 from pprint import pformat
 from threading import Thread
+import subprocess
 import time
 from dataclasses import dataclass, field
 import matplotlib.pyplot as plt
@@ -23,6 +24,7 @@ import nav2_simple_commander.robot_navigator as nav2
 
 # ROS msg types
 from geometry_msgs.msg import PoseStamped
+from nav2_msgs.msg import Costmap
 from nav2_msgs.srv import LoadMap
 
 # Custom modules
@@ -74,7 +76,7 @@ class ControllerBenchmark:
         self.config_path = config_path
         self.default_controller_params = mppi_params
         self.params: Dict = {}
-        self.map: MapData = None
+        self.mapdata: MapData = None
         self.load_config()
 
         self.nodes: Dict = {}
@@ -84,6 +86,8 @@ class ControllerBenchmark:
 
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
+
+        self.update_map(self.mapdata)
 
         self.results: List[ControllerResult] = []
 
@@ -228,6 +232,28 @@ class ControllerBenchmark:
         self.nav.info('Change local map request was successful!')
         return True
 
+    def update_map(self, mapdata: MapData) -> Tuple[bool, str]:
+        self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
+        res = self.changeGlobalMap(mapdata.yaml_path)
+        if res is False:
+            msg = 'Failed to change global map'
+            result = False
+            self.logger.error('Failed to run benchmark: %s', msg)
+            return result, msg
+
+        local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
+        self.logger.info(f'Changing local map to: {local_map_path}')
+        res = self.changeLocalMap(local_map_path)
+        if res is False:
+            msg = 'Failed to change local map'
+            result = False
+            self.logger.error('Failed to run benchmark: %s', msg)
+            return result, msg
+
+        self.nav.clearAllCostmaps()
+        time.sleep(0.5)
+        return True, 'Maps updated'
+
     @timing_decorator(
         lambda self: self.logger.info('Launching nodes...'),
         lambda self, ex_time: self.logger.info(f'Launched nodes in {ex_time:.4f} seconds.'))
@@ -259,13 +285,11 @@ class ControllerBenchmark:
             self.logger.warn('Executor failed to spin')
 
     def _start_data_collection(self):
-        self.logger.info('Starting data collection.')
         for name, node in self.nodes.items():
             if 'sub' in name:
                 node.collect_data = True
 
     def _stop_data_collection(self):
-        self.logger.info('Stopping data collection.')
         for name, node in self.nodes.items():
             if 'sub' in name:
                 node.collect_data = False
@@ -290,13 +314,65 @@ class ControllerBenchmark:
             raise RuntimeError(f'Failed to stop nodes: {e}')
 
     @timing_decorator(
+        lambda self: self.logger.info('Checking if nodes are active...'),
+        lambda self, ex_time: self.logger.info(f'Checked nodes in {ex_time:.4f} seconds.')
+    )
+    def check_launch_nodes_active(self) -> Tuple[bool, str]:
+        running_nodes = []
+        try:
+            # Run `ros2 node list` and decode output
+            result = subprocess.run(
+                ["ros2", "node", "list"], capture_output=True, text=True, check=True)
+            # Split the output by lines to get each node name
+            running_nodes = result.stdout.strip().splitlines()
+            if self.logger.isEnabledFor(logging.DEBUG):
+                self.logger.debug(f'Running nodes: {running_nodes}')
+        except subprocess.CalledProcessError as e:
+            return False, e
+
+        expected = [
+            "/controller_server",
+            "/gazebo",
+            "/gazebo_ros_state",
+            "/global_costmap/global_costmap",
+            "/lifecycle_manager",
+            "/local_costmap/local_costmap",
+            "/local_map_server",
+            "/map_odom_broadcaster",
+            "/map_server",
+            "/planner_server",
+            "/robot_state_publisher",
+            # "/rviz",
+            # "/rviz_navigation_dialog_action_client",
+            # "/transform_listener_impl_5dd763758dc0",
+            # "/transform_listener_impl_61933a70ffb0",
+            # "/transform_listener_impl_79ac64003470",
+            "/turtlebot3_diff_drive",
+            "/turtlebot3_imu",
+            "/turtlebot3_joint_state",
+            "/turtlebot3_laserscan"
+        ]
+
+        missing_nodes = [node for node in expected if node not in running_nodes]
+
+        if len(missing_nodes) > 0:
+            return False, f'Missing nodes: {missing_nodes}'
+
+        return True, 'All nodes are active'
+
+    @timing_decorator(
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
     def run_benchmark(
-            self, parameters: MPPIControllerParameters = None,
-            store_result: bool = False) -> ControllerResult:
+            self, parameters: MPPIControllerParameters = None, mapdata: MapData = None,
+            timeout: float = None, store_result: bool = False) -> ControllerResult:
         # _____________________ BENCHMARK SETUP _____________________
-        mapdata = self.mapdata
+        update_map = False
+        if mapdata is None:
+            mapdata = self.mapdata
+        else:
+            update_map = True
+
         result = ControllerResult(
             controller_name=self.params['controller'], map_name=mapdata.name)
 
@@ -321,31 +397,35 @@ class ControllerBenchmark:
             return result
 
         # change global and local map
-        self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
-        res = self.changeGlobalMap(mapdata.yaml_path)
-        if res is False:
-            msg = 'Failed to change global map'
-            result.success = False
-            result.status_msg = msg
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result
+        if update_map is True:
+            success, msg = self.update_map(mapdata)
+            if success is False:
+                result.success = False
+                result.status_msg = msg
+                self.logger.error('Failed to run benchmark: %s', msg)
+                return result
 
-        local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
-        self.logger.info(f'Changing local map to: {local_map_path}')
-        res = self.changeLocalMap(local_map_path)
-        if res is False:
-            msg = 'Failed to change local map'
-            result.success = False
-            result.status_msg = msg
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result
+        # self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
+        # res = self.changeGlobalMap(mapdata.yaml_path)
+        # if res is False:
+        #     msg = 'Failed to change global map'
+        #     result.success = False
+        #     result.status_msg = msg
+        #     self.logger.error('Failed to run benchmark: %s', msg)
+        #     return result
 
-        self.nav.clearAllCostmaps()
-        time.sleep(0.5)
+        # local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
+        # self.logger.info(f'Changing local map to: {local_map_path}')
+        # res = self.changeLocalMap(local_map_path)
+        # if res is False:
+        #     msg = 'Failed to change local map'
+        #     result.success = False
+        #     result.status_msg = msg
+        #     self.logger.error('Failed to run benchmark: %s', msg)
+        #     return result
 
-        # start data collection
-        self.logger.info('Starting data collection.')
-        self._start_data_collection()
+        # self.nav.clearAllCostmaps()
+        # time.sleep(0.5)
 
         # getting start and goal pose
         self.logger.info('Generating robot start and goal pose.')
@@ -353,6 +433,10 @@ class ControllerBenchmark:
         self.marker_server.publish_markers([start], 'start', (1., 0., 0.))
         goal: PoseStamped = mapdata.goal
         self.marker_server.publish_markers([goal], 'goal', (0., 1., 0.))
+
+        # start data collection
+        self.logger.info('Starting data collection.')
+        self._start_data_collection()
 
         # resetting world and setting robot pose
         # TODO: check if successful (not really priority)
@@ -378,6 +462,9 @@ class ControllerBenchmark:
         # calculate timout for the global plan
         path_xy = np.array([
             (ps.pose.position.x, ps.pose.position.y) for ps in global_plan.poses])
+        # TODO: quaternion to radian
+        path_omega = np.array([
+            ps.pose.orientation.z for ps in global_plan.poses])
 
         # TODO
         # distances = np.sqrt(np.sum(np.diff(path_xy, axis=0)**2, axis=1))
@@ -399,6 +486,15 @@ class ControllerBenchmark:
             return result
 
         while not self.nav.isTaskComplete():
+            if timeout is not None:
+                run_time = (rclpy.clock.Clock().now() - start_time).nanoseconds * 1e-9
+                if run_time > timeout:
+                    self.nav.cancelTask()
+                    msg = f'Timeout reached: {run_time} > {timeout}'
+                    result.success = False
+                    result.status_msg = msg
+                    self.logger.error('Failed to run benchmark: %s', msg)
+                    return result
             time.sleep(1)
 
         end_time: rclpy.clock.Time = rclpy.clock.Clock().now()
@@ -423,25 +519,45 @@ class ControllerBenchmark:
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
 
-        odom_xy, odom_t = self.odom_sub.get_data_between(
+        odom_xy, odom_omega, odom_t = self.odom_sub.get_data_between(
             start_time.nanoseconds, end_time.nanoseconds)
         cmd_vel_xy, cmd_vel_omega, cmd_vel_t = self.cmd_vel_sub.get_data_between(
             start_time.nanoseconds, end_time.nanoseconds)
         critic_scores, critic_scores_t = self.mppi_critic_sub.get_data_between(
             start_time.nanoseconds, end_time.nanoseconds)
 
-        result.start_time = start_time.nanoseconds
+        # getting local costmap as array
+        costmap_msg: Costmap = self.nav.getLocalCostmap()
+        size_x = costmap_msg.metadata.size_x
+        size_y = costmap_msg.metadata.size_y
+        costmap_array = np.array(costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
+        costmap_array = np.flip(costmap_array, 0)
+
+        map_resolution = costmap_msg.metadata.resolution
+        origin_x = costmap_msg.metadata.origin.position.x
+        origin_y = costmap_msg.metadata.origin.position.y
+        path_costs = []
+        for x, y in path_xy:
+            x_idx = int((x - origin_x) / map_resolution)
+            y_idx = int((y - origin_y) / map_resolution)
+            path_costs.append(costmap_msg.data[y_idx * size_x + x_idx])
+
+        result.start_time = start_time.nanoseconds * 1e-9
         result.time_elapsed = time_elapsed
         result.success = True
+        result.status_msg = 'Success'
         result.path_xy = path_xy
+        result.path_omega = path_omega
         result.odom_xy = odom_xy
+        result.odom_omega = odom_omega
         result.odom_t = odom_t
         result.cmd_vel_xy = cmd_vel_xy
         result.cmd_vel_omega = cmd_vel_omega
         result.cmd_vel_t = cmd_vel_t
         result.critic_scores = critic_scores
         result.critic_scores_t = critic_scores_t
-        result.avg_costs = None
+        result.costmap = costmap_array
+        result.path_costs = np.array(path_costs)
 
         if store_result is True:
             self.results.append(result)
@@ -465,33 +581,45 @@ class ControllerBenchmark:
         lambda self: self.logger.info('Calculating metric...'),
         lambda self, ex_time: self.logger.info(f'Calculated metric in {ex_time:.4f} seconds.'))
     def calculate_metric(self, result: ControllerResult) -> ControllerMetric:
-        dist_to_goal = np.linalg.norm(result.path_xy[-1] - result.odom_xy[-1])
+        distance_to_goal = np.linalg.norm(result.path_xy[-1] - result.odom_xy[-1])
+        angle_to_goal = result.path_omega[-1] - result.odom_omega[-1]
 
         dt = np.mean(np.diff(result.cmd_vel_t))
         acc_lin = newton_diff(result.cmd_vel_xy[:, 0], dt)
         jerk_lin = newton_diff(acc_lin, dt)
-        ms_lin_jerk = np.sqrt(np.mean(jerk_lin**2))
+        rms_lin_jerk = np.sqrt(np.mean(jerk_lin**2))
 
         acc_ang = newton_diff(result.cmd_vel_omega, dt)
         jerk_ang = newton_diff(acc_ang, dt)
-        ms_ang_jerk = np.sqrt(np.mean(jerk_ang**2))
+        rms_ang_jerk = np.sqrt(np.mean(jerk_ang**2))
 
         return ControllerMetric(
             controller_name=result.controller_name,
             map_name=result.map_name,
             time_elapsed=result.time_elapsed,
             success=result.success,
-            max_linear_velocity=np.max(result.cmd_vel_xy[:, 0]),
+            distance_to_goal=distance_to_goal,
+            angle_to_goal=angle_to_goal / np.pi * 180,  # rad to deg
+            path_xy=result.path_xy,
+            linear_velocity=result.cmd_vel_xy[:, 0],
             avg_linear_velocity=np.mean(result.cmd_vel_xy[:, 0]),
-            max_linear_acceleration=np.max(acc_lin),
+            max_linear_velocity=np.max(result.cmd_vel_xy[:, 0]),
+            rms_linear_velocity=np.sqrt(np.mean(result.cmd_vel_xy[:, 0]**2)),
+            linear_acceleration=acc_lin,
             avg_linear_acceleration=np.mean(acc_lin),
+            max_linear_acceleration=np.max(acc_lin),
+            rms_linear_acceleration=np.sqrt(np.mean(acc_lin**2)),
             max_angular_acceleration=np.max(acc_ang),
             avg_angular_acceleration=np.mean(acc_ang),
-            distance_to_goal=dist_to_goal,
             linear_jerks=jerk_lin,
-            ms_linear_jerk=ms_lin_jerk,
+            rms_linear_jerk=rms_lin_jerk,
             angular_jerks=jerk_ang,
-            ms_angular_jerk=ms_ang_jerk)
+            rms_angular_jerk=rms_ang_jerk,
+            path_costs=result.path_costs,
+            sum_of_costs=np.sum(result.path_costs),
+            avg_cost=np.mean(result.path_costs),
+            rms_cost=np.sqrt(np.mean(result.path_costs**2))
+        )
 
     def save_result(self, result: ControllerResult, sub_folder: str = '') -> None:
         self.logger.info(f'Saving result: {result.map_name}.')
@@ -523,12 +651,13 @@ class ControllerBenchmark:
         latest_file_path = max(results_files, key=os.path.getctime)
         return self.load_result(latest_file_path)
 
-    def save_metric(self, metric: ControllerMetric) -> None:
-        self.logger.info(f'Saving metric: {metric.map_name}.')
-
+    def save_metric(self, metric: ControllerMetric, path: str = None) -> None:
         stamp = time.strftime(self.params['timestamp_format'])
-        filename = f'controller_benchmark_metric_{stamp}.pickle'
-        with open(os.path.join(self.METRICS_PATH, filename), 'wb+') as f:
+        filename = f'metric_{stamp}.pickle'
+        self.logger.info(f'Saving metric: {filename}.')
+        save_path = path if path is not None else os.path.join(
+            ControllerBenchmark.METRICS_PATH, filename)
+        with open(save_path, 'wb+') as f:
             pickle.dump(metric, f, pickle.HIGHEST_PROTOCOL)
         self.logger.info(f'Written metric to: {filename}')
 
@@ -544,7 +673,7 @@ class ControllerBenchmark:
 
     def load_last_metric(self) -> ControllerMetric:
         metrics_files = glob.glob(os.path.join(
-            self.METRICS_PATH, 'controller_benchmark_metric_*.pickle'))
+            self.METRICS_PATH, 'metric_*.pickle'))
         latest_file_path = max(metrics_files, key=os.path.getctime)
         return self.load_metric(latest_file_path)
 
@@ -651,9 +780,9 @@ class ControllerBenchmark:
         cmd_vel_t_s = result.cmd_vel_t
         ax_jerk.set_xlabel('Time [s]')
         ax_jerk.set_ylabel('Jerk [m/s^3], [rad/s^3]')
-        label = f'Linear jerk - RMS: {metric.ms_linear_jerk:.2f} [m/s^3]'
+        label = f'Linear jerk - RMS: {metric.rms_linear_jerk:.2f} [m/s^3]'
         ax_jerk.plot(cmd_vel_t_s, metric.linear_jerks, label=label, color='b')
-        label = f'Angular jerk - RMS: {metric.ms_angular_jerk:.2f} [rad/s^3]'
+        label = f'Angular jerk - RMS: {metric.rms_angular_jerk:.2f} [rad/s^3]'
         ax_jerk.plot(cmd_vel_t_s, metric.angular_jerks, label=label, color='r')
         ax_jerk.grid(visible=True, which='both', axis='both')
         ax_jerk.legend()
