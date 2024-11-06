@@ -8,7 +8,17 @@ odom_topic: /odom
 costmap_topic: /local_costmap/costmap
 mppi_critic_topic: /mppi_critic_scores
 # maps: [corridor_empty, corridor_mid_obstacles, corridor_side_obstacles]
-maps: [corridor_mixed]
+map: complex
+complex:
+  path: 'maps/complex.yaml'
+  start_pose:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  goal_pose:
+    x: 10.3
+    y: 0.0
+    yaw: 0.0
 corridor_empty:
   path: 'maps/corridor_empty.yaml'
   start_pose:
@@ -45,6 +55,7 @@ corridor_side_obstacles:
     yaw: 0.0
 corridor_mixed:
   path: 'maps/corridor_mixed.yaml'
+  # path_local: 'maps/corridor_mixed_local.yaml'
   start_pose:
     x: 0.0
     y: 0.0
