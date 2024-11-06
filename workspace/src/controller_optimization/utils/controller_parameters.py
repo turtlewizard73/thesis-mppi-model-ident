@@ -77,8 +77,8 @@ class MPPIControllerParameters:
         mppi_dict = {}
         for critic in self.critics:
             mppi_dict.update({
-                f'{self.name}.{critic.name}.cost_weight': critic.cost_weight,
-                f'{self.name}.{critic.name}.cost_power': critic.cost_power
+                f'{self.name}.{critic.name}.cost_weight': float(critic.cost_weight),
+                f'{self.name}.{critic.name}.cost_power': float(critic.cost_power)
             })
 
         return mppi_dict
