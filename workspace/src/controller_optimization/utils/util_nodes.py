@@ -140,9 +140,6 @@ class OdomSubscriber(Node):
 
         self.collect_data = False
 
-        # self.start_stop_service = self.create_service(
-        #     Trigger, 'start_stop_collecting', self.start_stop_collecting)
-
         self.subscription = self.create_subscription(
             Odometry, topic, self.callback, 10)
         self.get_logger().info('odom_subscriber initialized')

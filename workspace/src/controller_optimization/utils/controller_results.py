@@ -14,6 +14,7 @@ class ControllerResult:
     start_time: float = 0.0  # nanoseconds (to substract from time arrays)
     time_elapsed: float = 0.0  # nanoseconds
     success: bool = False  # if the controller reached the goal approximately
+    status_msg: str = ''  # reason of fail or extra info
 
     # path xy from
     # nav_msg/Path https://docs.ros.org/en/hydro/api/nav_msgs/html/msg/Path.html
@@ -79,5 +80,3 @@ class ControllerResult:
 
     # min cost of fatal distance
     min_cost_from_fatal: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
-
-

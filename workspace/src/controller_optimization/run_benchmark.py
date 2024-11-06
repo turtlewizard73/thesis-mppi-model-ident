@@ -7,21 +7,21 @@ import os
 from time import strftime
 import matplotlib.pyplot as plt
 from controller_benchmark import ControllerBenchmark
+from utils.controller_results import ControllerResult
+from utils.controller_parameters import MPPIControllerParameters
 
 BASE_PATH = os.path.dirname(__file__)
+LAUNCH_PATH = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_launch'
+global logger, controller_benchmark
 
 
-def main():
+def setup(logger_name: str = 'ControllerBenchmark') -> logging.Logger:
+    global logger
+
     parser = argparse.ArgumentParser(description='Run controller benchmark.')
     parser.add_argument(
         '-d', '--debug', action='store_true', default=False,
         help='Run in debug mode.')
-    parser.add_argument(
-        '-p', '--plot_only', action='store_true', default=False,
-        help='Plot results only, no test run')
-    parser.add_argument(
-        '-r', '--process_results', action='store_true', default=False,
-        help='Only process results, no test run.')
     args = parser.parse_args()
 
     # LOGGING
@@ -50,44 +50,46 @@ def main():
     logger.addHandler(ch)
     logger.addHandler(fh)
 
-    if args.plot_only is True:
-        print('Plotting only.')
-        # TODO: plot the latest results
-    elif args.process_results is True:
-        print('Processing results only.')
-        # TODO: processing the latest results
-    # if args.process_results is True and args.plot_only is True:
-    #     raise ValueError('Unable to use both flags at the same time.')
+
+def test_benchmark():
+    global controller_benchmark, logger
+    controller_benchmark.launch_nodes()
+    result: ControllerResult = controller_benchmark.run_benchmark()
+    logger.info("____________________")
+    logger.info(f"Benchmark result: {result.success}, {result.status_msg}")
+    controller_benchmark.save_result(result)
+    controller_benchmark.stop_nodes()
+
+    fig_result = controller_benchmark.plot_result(result)
+    metric = controller_benchmark.calculate_metric(result)
+    controller_benchmark.save_metric(metric)
+
+    fig_metric = controller_benchmark.plot_metric(result, metric)
+
+    plt.show()
+
+
+def plot(metric, result):
+    # read last metric and result
+    pass
+
+
+def main():
+    global logger, controller_benchmark
+    setup()
+
+    default_mppi_params = MPPIControllerParameters()
+    default_mppi_params.load_from_yaml(
+        os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
+
+    logger.info("Default mppi parameters initialized: \n%s", default_mppi_params)
 
     controller_benchmark = ControllerBenchmark(
         logger=logger,
-        config_path=os.path.join(
-            BASE_PATH, 'config/controller_benchmark_config.yaml')
-    )
+        config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'),
+        mppi_params=default_mppi_params)
 
-    if args.plot_only is False:
-        controller_benchmark.launch_nodes()
-
-        success, results = controller_benchmark.run_benchmark(store_results=False)
-        res = results[0]
-        controller_benchmark.save_result(res)
-        controller_benchmark.stop_nodes()
-
-        fig_result = controller_benchmark.plot_result(res)
-        metric = controller_benchmark.calculate_metric(res)
-        fig_metric = controller_benchmark.plot_metric(res, metric)
-        plt.show()
-    else:
-        res = controller_benchmark.load_last_result()
-
-        controller_benchmark.save_result(res, sub_folder='test')
-
-        fig_result = controller_benchmark.plot_result(res)
-
-        metric = controller_benchmark.calculate_metric(res)
-        fig_metrics = controller_benchmark.plot_metric(res, metric)
-        plt.show()
-
+    test_benchmark()
     exit(0)
 
 

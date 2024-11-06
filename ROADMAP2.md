@@ -69,7 +69,12 @@ rárakni valami pluszba csak a local costmapre, hogy az útról eltávolodás é
   - érjen oda minél gyorsabban > elapsed time
   - de minél kisebb coston -> static map full cost szummázva az úton
   - ez a kettő ugyan olyan súllyal mert ugyanazon a mapon találja a meg a leggyorsabb olyan utat amin a legkisebb a cost
+  - igazából lehetne három, hogy jusson el a célponthoz
+    - distance és angle diff
 - https://docs.nav2.org/commander_api/index.html
+- added local costmap
+  - indoklás: a kontrollernek nem szögletesen az út követése a lényege, hanem hogy kikerüljön dinamikus akadályt
+- amúgye ez lehet opcionális
 
 
 So i have an optimization problem.

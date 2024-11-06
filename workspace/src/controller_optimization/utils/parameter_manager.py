@@ -32,7 +32,7 @@ class ParameterManager(Node):
             self.get_logger().error('Failed to get parameters')
             return None
 
-    def set_parameters(self, parameters: Dict[str, Any]) -> Optional[List[bool]]:
+    def set_parameters(self, parameters: Dict[str, Any]) -> bool:
         self.get_logger().info(f'Setting parameters for {self.target_node_name}.')
 
         request = SetParameters.Request()
@@ -51,7 +51,7 @@ class ParameterManager(Node):
                     type=ParameterType.PARAMETER_STRING, string_value=value)
             else:
                 self.get_logger().error(f'Unsupported parameter type: {type(value)}')
-                return None
+                return False
 
             request.parameters.append(Parameter(name=name, value=param_value))
 
@@ -64,10 +64,10 @@ class ParameterManager(Node):
         rclpy.spin_until_future_complete(self, future)
 
         if future.result() is not None:
-            return [result.successful for result in future.result().results]
+            return all(future.result().results)
         else:
             self.get_logger().error('Failed to set parameters')
-            return None
+            return False
 
 # example usage
 # rclpy.init()

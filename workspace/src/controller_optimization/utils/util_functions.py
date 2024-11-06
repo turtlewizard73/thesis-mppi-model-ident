@@ -79,6 +79,10 @@ def yaw2quat(yaw: float) -> Quaternion:
     return quat
 
 
+def plan_length(plan: np.ndarray) -> float:
+    return np.sum(np.linalg.norm(plan[1:] - plan[:-1], axis=1))
+
+
 def newton_diff(y: np.ndarray, dt: float) -> np.ndarray:
     derivative = np.zeros_like(y)
     # Central differences
