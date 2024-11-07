@@ -51,6 +51,9 @@ def random_search():
         BASE_PATH, 'optimization_results', f'random_search_{stamp}')
     if not os.path.exists(working_dir):
         os.makedirs(working_dir)
+    working_metrics_dir = os.path.join(working_dir, 'metrics')
+    if not os.path.exists(working_metrics_dir):
+        os.makedirs(working_metrics_dir)
 
     logger.info(f"Starting random search, output: {working_dir}.")
     controller_benchmark.launch_nodes()
@@ -63,7 +66,7 @@ def random_search():
     reference_score = score_random_search(reference_metric)
 
     # setup the random search
-    num_trials = 1000
+    num_trials = 5
     timeout = reference_metric.time_elapsed * 2
     best_score = reference_score
     best_params = deepcopy(default_mppi_params)
@@ -71,7 +74,7 @@ def random_search():
     test_mppi_params = deepcopy(default_mppi_params)
 
     loop_start_time = time.time()
-    executed_trials = 0
+    successful_trials = 0
     try:
         for i in range(num_trials):
             start_time = time.time()
@@ -90,6 +93,7 @@ def random_search():
             result.uid = f'trial_{i}'
 
             if result.success is True:
+                successful_trials += 1
                 metric = controller_benchmark.calculate_metric(result)
                 metric.uid = f'trial_{i}'
                 score = score_random_search(metric)
@@ -113,6 +117,7 @@ def random_search():
             with open(os.path.join(working_dir, filename), 'w') as f:
                 output_dict = {
                     'score': float(score),
+                    'msg': str(result.status_msg),
                     'time': end_time - start_time,
                     'parameters': test_mppi_params.to_dict(),
                     'metric_path': metric_path}
@@ -120,20 +125,20 @@ def random_search():
 
             logger.info(
                 f'______ Trial {i}/{num_trials} - Score: {score} finished in {end_time - start_time} s. ______')
-            executed_trials += 1
+
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, stopping.")
     except Exception as e:
         logger.error(f"Error in trial: {e}")
 
-    reference_metric_path = os.path.join(working_dir, f'reference_metric_{stamp}.pickle')
+    reference_metric_path = os.path.join(working_metrics_dir, f'reference_metric_{stamp}.pickle')
     with open(reference_metric_path, 'wb+') as f:
         pickle.dump(reference_metric, f, pickle.HIGHEST_PROTOCOL)
 
-    with open(os.path.join(working_dir, f'search_result_{stamp}.yaml'), 'w') as f:
+    with open(os.path.join(working_dir, 'output_0_result.yaml'), 'w') as f:
         result_dict = {
             'num_trials': num_trials,
-            'executed_trials': executed_trials,
+            'successful_trials': successful_trials,
             'timeout': timeout,
             'loop_time': time.time() - loop_start_time,
             'best_score': float(best_score),
