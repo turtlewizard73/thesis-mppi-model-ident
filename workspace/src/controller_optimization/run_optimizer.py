@@ -63,9 +63,9 @@ def random_search():
     reference_score = score_random_search(reference_metric)
 
     # setup the random search
-    num_trials = 50
+    num_trials = 1000
     timeout = reference_metric.time_elapsed * 2
-    best_score = 0.0
+    best_score = reference_score
     best_params = deepcopy(default_mppi_params)
     best_metric_path = ''
     test_mppi_params = deepcopy(default_mppi_params)
@@ -82,7 +82,8 @@ def random_search():
 
             # generate parameters
             test_mppi_params.randomize_weights(
-                distribution='uniform', lower_bound=0.1, upper_bound=100.0)
+                distribution='uniform', lower_bound=0.1, upper_bound=100.0,
+                decimals=0)
             # run simulation and get metrics
             result = controller_benchmark.run_benchmark(
                 parameters=test_mppi_params, timeout=timeout)
@@ -94,7 +95,7 @@ def random_search():
                 score = score_random_search(metric)
 
                 # evaluate performance and update best parameters if needed
-                if score < reference_score:
+                if score < best_score:
                     best_score = score
                     best_params = deepcopy(test_mppi_params)
                     best_metric_path = metric_path
