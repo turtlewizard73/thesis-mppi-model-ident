@@ -1,0 +1,9 @@
+free_thresh: 0.196
+image: corridor_mixed_local.png
+negate: 0
+occupied_thresh: 0.65
+origin:
+- -1.0
+- -1.5
+- 0.0
+resolution: 0.05

@@ -1,6 +1,10 @@
 #! /usr/bin/env python3
 
 # Common modules
+import os
+import argparse
+import logging
+from time import strftime
 import time
 # import yaml
 import yaml
@@ -10,6 +14,43 @@ from scipy.spatial.transform import Rotation
 
 # ROS msg types
 from geometry_msgs.msg import Quaternion
+
+
+def setup_run(
+        logger_name: str = 'ControllerBenchmark',
+        log_file_path: str = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/logs') -> logging.Logger:
+    parser = argparse.ArgumentParser(description='Run controller benchmark.')
+    parser.add_argument(
+        '-d', '--debug', action='store_true', default=False,
+        help='Run in debug mode.')
+    args = parser.parse_args()
+
+    # LOGGING
+    logging_level = logging.DEBUG if args.debug is True else logging.INFO
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging_level)
+
+    # create console handler
+    ch = logging.StreamHandler()
+    ch.setLevel(logging_level)
+    # create file handler
+    stamp = strftime('%Y-%m-%d-%H-%M-%S')
+    log_file = os.path.join(log_file_path, f'{logger_name.lower()}_{stamp}.log')
+    fh = logging.FileHandler(
+        filename=log_file,
+        mode='w',
+        encoding='utf-8')
+    fh.setLevel(logging_level)
+
+    # create formatter
+    formatter = logging.Formatter('[%(levelname)s] [%(asctime)s] [%(name)s] %(message)s')
+    ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
+
+    # add ch and fh to logger
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+    return logger
 
 
 def timing_decorator(on_start, on_end):
@@ -77,6 +118,10 @@ def yaw2quat(yaw: float) -> Quaternion:
     quat.z = q[2]
     quat.w = q[3]
     return quat
+
+
+def plan_length(plan: np.ndarray) -> float:
+    return np.sum(np.linalg.norm(plan[1:] - plan[:-1], axis=1))
 
 
 def newton_diff(y: np.ndarray, dt: float) -> np.ndarray:

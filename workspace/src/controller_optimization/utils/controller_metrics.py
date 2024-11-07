@@ -11,26 +11,49 @@ class ControllerMetric:
     # represent a result of a parametrized controller run on a single plan/map
     controller_name: str
     map_name: str
+    uid: str = ''  # unique identifier, could be a timestamp, id or params
 
-    time_elapsed: float = 0.0  # nanoseconds
+    time_elapsed: float = 0.0  # [s]
     success: bool = False  # if the controller reached the goal approximately
+    distance_to_goal: float = 0.0  # [m] stopping distance from the goal
+    angle_to_goal: float = 0.0  # [rad] stopping angle difference from the goal
 
-    max_linear_velocity: float = 0.0  # [m/s] maximum velocity
-    avg_linear_velocity: float = 0.0  # [m/s] average velocity
-    max_linear_acceleration: float = 0.0  # [m/s^2] maximum acceleration
-    avg_linear_acceleration: float = 0.0  # [m/s^2] average acceleration
+    # generated plan on global map
+    path_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+
+    # linear velocity metrics
+    linear_velocity: np.ndarray = field(
+        default_factory=lambda: np.empty((0, 1)))  # [m/s] velocity
+    avg_linear_velocity: float = 0.0  # [m/s] average linear velocity
+    max_linear_velocity: float = 0.0  # [m/s] maximum linear velocity
+    rms_linear_velocity: float = 0.0  # [m/s] root mean squared linear velocity
+
+    # linear acceleration metrics
+    linear_acceleration: np.ndarray = field(
+        default_factory=lambda: np.empty((0, 1)))  # [m/s^2] acceleration
+    avg_linear_acceleration: float = 0.0  # [m/s^2] average linear acceleration
+    max_linear_acceleration: float = 0.0  # [m/s^2] maximum linear acceleration
+    rms_linear_acceleration: float = 0.0  # [m/s^2] root mean squared linear acceleration
+
+    # angular acceleration metrics
     max_angular_acceleration: float = 0.0  # [rad/s^2] maximum angular acceleration
     avg_angular_acceleration: float = 0.0  # [rad/s^2] average angular acceleration
 
-    distance_to_goal: float = 0.0  # [m] stopping distance from the goal
-
+    # jerk metrics
     linear_jerks: np.ndarray = field(
         default_factory=lambda: np.empty((0, 1)))  # [m/s^3] jerk
-    ms_linear_jerk: float = 0.0  # [m/s^3] mean squared linear jerk
+    rms_linear_jerk: float = 0.0  # [m/s^3] root mean squared linear jerk
 
     angular_jerks: np.ndarray = field(
         default_factory=lambda: np.empty((0, 1)))  # [rad/s^3] angular jerk
-    ms_angular_jerk: float = 0.0  # [rad/s^3] mean squared angular jerk
+    rms_angular_jerk: float = 0.0  # [rad/s^3] root mean squared angular jerk
+
+    # costs
+    path_costs: np.ndarray = field(  # cost of cells along the traversed path
+        default_factory=lambda: np.empty((0, 1)))
+    sum_of_costs: float = 0.0  # sum of all costs
+    avg_cost: float = 0.0  # average cost
+    rms_cost: float = 0.0  # root mean squared cost
 
     def to_table_string(self) -> str:
         # Create a header and rows with values aligned
@@ -43,45 +66,7 @@ class ControllerMetric:
             f"{'Average Linear Acceleration':<30} | {self.avg_linear_acceleration} m/s²\n"
             f"{'Maximum Angular Acceleration':<30} | {self.max_angular_acceleration} rad/s²\n"
             f"{'Average Angular Acceleration':<30} | {self.avg_angular_acceleration} rad/s²\n"
-            f"{'Root Mean Squared Linear Jerk':<30} | {self.ms_linear_jerk} m/s³\n"
-            f"{'Root Mean Squared Angular Jerk':<30} | {self.ms_angular_jerk} rad/s³\n"
+            f"{'Root root mean squared Linear Jerk':<30} | {self.rms_linear_jerk} m/s³\n"
+            f"{'Root root mean squared Angular Jerk':<30} | {self.rms_angular_jerk} rad/s³\n"
         )
         return table
-
-
-# @dataclass
-# class ControllerMetricOld:
-#     controller_name: str
-#     plan_idx: int
-
-#     # success metrics
-#     result: bool
-#     distance_to_goal: float  # [m]
-#     time: float  # [s]
-
-#     # trajectory metrics
-#     plan_length: float  # [m]
-#     traversed_length: float  # [m]
-#     completion_ratio: float
-#     frechet_dist: float
-
-#     # dynamic metrics
-#     avg_linear_vel: float  # [m/s]
-#     avg_linear_acc: float  # [m/s^2]
-#     ms_linear_jerk: float  # [m/s^3]
-
-#     avg_angular_vel: float  # [rad/s]
-#     avg_angular_acc: float  # [rad/s^2]
-#     ms_angular_jerk: float  # [rad/s^3]
-
-#     # raw data in case of further analysis
-#     plan_poses: np.ndarray
-#     route_poses: np.ndarray
-
-#     time_steps: List[float]
-#     linear_acc: List[float]
-#     linear_jerks: List[float]
-#     angular_acc: List[float]
-#     angular_jerks: List[float]
-
-#     critic_scores: Dict[str, List[float]]

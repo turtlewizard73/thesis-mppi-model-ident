@@ -14,16 +14,23 @@ from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
     this_package_dir = get_package_share_directory('controller_launch')
+    old_launch_dir = get_package_share_directory('controller_benchmark')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
     gazebo_dir = get_package_share_directory('gazebo_ros')
 
     gui = LaunchConfiguration('gui')
 
-    map_file = os.path.join(this_package_dir, 'empty_map.yaml')
+    rviz_config_file = os.path.join(this_package_dir, 'nav2_default_view.rviz')
+    global_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
+    local_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
 
     nav_config = os.path.join(this_package_dir, 'nav2_params_benchmark.yaml')
+    # nav_config = os.path.join(this_package_dir, 'default_nav2_params.yaml')
 
-    lifecycle_nodes = ['map_server', 'planner_server', 'controller_server']
+    lifecycle_nodes = [
+        'map_server', 'local_map_server', 'planner_server', 'controller_server']
+    # lifecycle_nodes = [
+    #     'map_server', 'planner_server', 'controller_server']
     world = os.path.join(this_package_dir, 'empty_world.world')
 
     urdf = os.path.join(this_package_dir, 'turtlebot3_waffle.urdf')
@@ -57,12 +64,14 @@ def generate_launch_description():
             description='Whether to run gazebo headless.'
         ),
 
-        # RVIZ
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(nav2_bringup_dir, 'launch', 'rviz_launch.py')),
-            launch_arguments={'namespace': '',
-                              'use_namespace': 'False'}.items()),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='map_odom_broadcaster',
+            output='screen',
+            # prefix=['valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no'],
+            parameters=[{'use_sim_time': True}],
+            arguments=["0", "0", "0", "0", "0", "0", "map", "odom"]),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
@@ -76,6 +85,14 @@ def generate_launch_description():
                 os.path.join(gazebo_dir, 'launch', 'gzclient.launch.py')),
             launch_arguments={'verbose': 'true'}.items(),
             condition=IfCondition(gui)),
+
+        # RVIZ
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(nav2_bringup_dir, 'launch', 'rviz_launch.py')),
+            launch_arguments={'namespace': '',
+                              'rviz_config_file': rviz_config_file,
+                              'use_namespace': 'False'}.items()),
 
         Node(
             package='robot_state_publisher',
@@ -101,22 +118,23 @@ def generate_launch_description():
                 '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']]),
 
         Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='map_odom_broadcaster',
-            output='screen',
-            # prefix=['valgrind --tool=callgrind --dump-instr=yes -v --instr-atstart=no'],
-            parameters=[{'use_sim_time': True}],
-            arguments=["0", "0", "0", "0", "0", "0", "map", "odom"]),
-
-        Node(
             package='nav2_map_server',
             executable='map_server',
             name='map_server',
             output='screen',
             parameters=[{'use_sim_time': True},
-                        {'yaml_filename': map_file},
+                        {'yaml_filename': global_map_file},
                         {'topic_name': 'map'},
+                        {'frame_id': 'map'}]),
+
+        Node(
+            package='nav2_map_server',
+            executable='map_server',
+            name='local_map_server',
+            output='screen',
+            parameters=[{'use_sim_time': True},
+                        {'yaml_filename': local_map_file},
+                        {'topic_name': 'map_local'},
                         {'frame_id': 'map'}]),
 
         Node(

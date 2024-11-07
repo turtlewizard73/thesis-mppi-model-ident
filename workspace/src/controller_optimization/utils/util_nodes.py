@@ -136,12 +136,10 @@ class OdomSubscriber(Node):
         super().__init__('odom_subscriber')
         # Initialize deques
         self.odom_xy = deque()
+        self.odom_omega = deque()
         self.odom_t_ns = deque()
 
         self.collect_data = False
-
-        # self.start_stop_service = self.create_service(
-        #     Trigger, 'start_stop_collecting', self.start_stop_collecting)
 
         self.subscription = self.create_subscription(
             Odometry, topic, self.callback, 10)
@@ -152,16 +150,19 @@ class OdomSubscriber(Node):
             return
         # Append position (x, y) and timestamp (in nanoseconds) to deques
         self.odom_t_ns.append(self.get_clock().now().nanoseconds)
+        # TODO: quaternion to radian
         self.odom_xy.append([msg.pose.pose.position.x, msg.pose.pose.position.y])
+        self.odom_omega.append(msg.pose.pose.orientation.z)
 
     def get_data_between(self, start_time_ns, end_time_ns) -> Tuple[np.ndarray, np.ndarray]:
         self.get_logger().debug(f'Getting data between {start_time_ns} and {end_time_ns}')
         # Assert that the deques are the same length
-        assert len(self.odom_xy) == len(
+        assert len(self.odom_xy) == len(self.odom_omega) == len(
             self.odom_t_ns), 'Length of odom_xy and odom_t_ns should be the same'
 
         # Convert deques to NumPy arrays for efficient slicing
         odom_xy = np.array(self.odom_xy)
+        odom_omega = np.array(self.odom_omega)
         odom_t_ns = np.array(self.odom_t_ns)
 
         # Create a boolean mask to filter values between start_time_ns and end_time_ns
@@ -169,18 +170,20 @@ class OdomSubscriber(Node):
 
         # Apply the mask to get the desired values
         xy_values = odom_xy[mask]
+        omega_values = odom_omega[mask]
         t_values = odom_t_ns[mask] - start_time_ns  # Wrap t to match desired ndarray shape
         t_values = t_values / 1e9  # Convert nanoseconds to seconds
 
         # Assert that the lengths of the arrays are the same after operation
-        assert len(xy_values) == len(
+        assert len(xy_values) == len(omega_values) == len(
             t_values), 'Length of xy_values and t_values should be the same'
 
         # Empty the deques
         self.odom_xy.clear()
+        self.odom_omega.clear()
         self.odom_t_ns.clear()
 
-        return xy_values, t_values
+        return xy_values, omega_values, t_values
 
 
 class CmdVelSubscriber(Node):
@@ -325,30 +328,3 @@ class MPPICriticSubscriber(Node):
             assert len(critic_score_values_dict[critic]) == len(t_values), \
                 'Length of critic scores and t_values should be the same'
         return critic_score_values_dict, np.array(t_values)
-
-
-class CostmapSubscriber(Node):
-    def __init__(self, topic: str, robot_radius: float):
-        super().__init__('costmap_subscriber')
-        self.costmaps_data: Deque = deque()
-        self.costmaps_t_ns: Deque = deque()
-
-        self.collect_data = False
-
-        self.subscription = self.create_subscription(
-            OccupancyGrid, topic, self.callback, 10)
-        self.get_logger().info('costmap_subscriber initialized')
-
-    def callback(self, msg):
-        if self.collect_data is False:
-            return
-        self.costmaps_t_ns.append(self.get_clock().now().nanoseconds)
-        costmap_data = np.asarray(msg.data)
-        costmap_data.resize((msg.info.height, msg.info.width))
-        self.costmaps_data.append(costmap_data)
-
-        # get avarage cost of robot at the center of the costmap
-        # center
-
-    def get_msgs(self, start_time: RosTime, end_time: RosTime):
-        pass

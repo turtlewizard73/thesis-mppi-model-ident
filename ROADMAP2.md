@@ -47,7 +47,46 @@ metrikák ból egy függvény ugye hogy közel milyen jó lenne pl
 (sebesség optimális - mért) * súly .....
 aztán kézzel irányítani -> majd abcd súlyokkal görbét illeszteni
 
+!!!!!!!!!!
+rárakni valami pluszba csak a local costmapre, hogy az útról eltávolodás és a célhoz közelebb jutás is jól belegyen állítva
+
 
 ## 2024. 10. 30.
 - setting params programatically from benchmark
 - https://roboticsbackend.com/rclpy-params-tutorial-get-set-ros2-params-with-python/
+
+## 2024. 11 04.
+- grid search nyilván nem jó majd leírni miért sok
+- ugye random is necco, elindulva optimálról átscalelni
+- timeout belerakás
+- mppi readmi alapján kicsit okosított nem teljesen random search
+- local costmapre plusz akadályt rakni, hogy az útról eltávolodás és a célhoz közelebb jutás is jól belegyen állítva
+- random search: https://medium.com/@hammad.ai/tuning-model-hyperparameters-with-random-search-f4c1cc88f528
+
+
+## 2024. 11 05.
+- szóval kettő metricre leszűkítés
+  - érjen oda minél gyorsabban > elapsed time
+  - de minél kisebb coston -> static map full cost szummázva az úton
+  - ez a kettő ugyan olyan súllyal mert ugyanazon a mapon találja a meg a leggyorsabb olyan utat amin a legkisebb a cost
+  - igazából lehetne három, hogy jusson el a célponthoz
+    - distance és angle diff
+- https://docs.nav2.org/commander_api/index.html
+- added local costmap
+  - indoklás: a kontrollernek nem szögletesen az út követése a lényege, hanem hogy kikerüljön dinamikus akadályt
+- amúgye ez lehet opcionális
+
+
+So i have an optimization problem.
+input1: 8 weights that can be anything from 0.01 to 100 (float)
+input2: 8 power that can be anything from 1 - 10 (float)
+
+And i have a mppi controller that these inputs are fed into.
+I run the mppi controller simulating on an arbitrary map where it controls a robot from point A to point B, after the run is finsihed i have a set of calculated metrics as output.
+output1: mean squared linear jerk
+output2: sum of costs on the path
+
+
+## 2024. 11. 06.
+- done the costmap to avg cost part
+  - fickung flipping
