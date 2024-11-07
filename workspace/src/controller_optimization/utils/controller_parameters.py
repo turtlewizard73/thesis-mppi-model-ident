@@ -36,6 +36,13 @@ class MPPIControllerParameters:
 
         return critics_str
 
+    def set_critic_weight(self, critic_name: str, weight: float):
+        for critic in self.critics:
+            if critic.name == critic_name:
+                critic.cost_weight = float(weight)
+                return
+        raise ValueError(f'Critic {critic_name} not found in MPPIControllerParameters.')
+
     def _find_mppi_controller(self, data: dict) -> Any:
         """Recursively searches for the MPPIController configuration."""
         search_key = 'nav2_mppi_controller::MPPIController'
@@ -77,8 +84,19 @@ class MPPIControllerParameters:
         mppi_dict = {}
         for critic in self.critics:
             mppi_dict.update({
-                f'{self.name}.{critic.name}.cost_weight': float(critic.cost_weight),
-                f'{self.name}.{critic.name}.cost_power': float(critic.cost_power)
+                f'{self.name}.{critic.name}.cost_weight': critic.cost_weight,
+                f'{self.name}.{critic.name}.cost_power': critic.cost_power
+            })
+
+        return mppi_dict
+
+    def to_dict_critics(self) -> dict:
+        """Converts the MPPIController parameters to a dictionary."""
+        mppi_dict = {}
+        for critic in self.critics:
+            mppi_dict.update({
+                f'{critic.name}.cost_weight': critic.cost_weight,
+                f'{critic.name}.cost_power': critic.cost_power
             })
 
         return mppi_dict
@@ -98,4 +116,4 @@ class MPPIControllerParameters:
             else:
                 raise ValueError('Unsupported distribution or missing parameters.')
 
-            critic.cost_weight = np.round(cost_weight, decimals)
+            critic.cost_weight = float(np.round(cost_weight, decimals))

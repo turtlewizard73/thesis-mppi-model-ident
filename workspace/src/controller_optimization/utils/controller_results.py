@@ -38,6 +38,7 @@ class ControllerResult:
     # TODO -> orientation - geometry_msgs/Quaternion
     #        -> x, y, z, w - float64
     odom_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+    odom_omega: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
     # odometry t from
     # nav_msg/Odometry
     #  -> header - std_msgs/Header

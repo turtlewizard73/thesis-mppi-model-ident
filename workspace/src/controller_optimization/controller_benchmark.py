@@ -177,10 +177,6 @@ class ControllerBenchmark:
         # init cmd_vel subscriber
         self.cmd_vel_sub = util_nodes.CmdVelSubscriber(self.params['cmd_vel_topic'])
         self.nodes['cmd_vel_sub'] = self.cmd_vel_sub
-        # init costmap subscriber
-        # self.costmap_sub = util_nodes.CostmapSubscriber(
-        #     topic=self.params['costmap_topic'])
-        # self.nodes['costmap_sub'] = self.costmap_sub
         # init mppi critic subscriber
         self.mppi_critic_sub = util_nodes.MPPICriticSubscriber(self.params['mppi_critic_topic'])
         self.nodes['mppi_critic_sub'] = self.mppi_critic_sub
@@ -364,17 +360,19 @@ class ControllerBenchmark:
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
     def run_benchmark(
-            self, parameters: MPPIControllerParameters = None, mapdata: MapData = None,
+            self, run_uid: str = '', parameters: MPPIControllerParameters = None, mapdata: MapData = None,
             timeout: float = None, store_result: bool = False) -> ControllerResult:
         # _____________________ BENCHMARK SETUP _____________________
-        update_map = False
-        if mapdata is None:
-            mapdata = self.mapdata
-        else:
-            update_map = True
+        update_map = False if mapdata is None else True
+        mapdata = self.mapdata if mapdata is None else mapdata
+
+        update_params = False if parameters is None else True
+        parameters = self.default_controller_params if parameters is None else parameters
 
         result = ControllerResult(
-            controller_name=self.params['controller'], map_name=mapdata.name)
+            controller_name=self.params['controller'],
+            map_name=mapdata.name,
+            uid=run_uid)
 
         # check if nodes are active
         if self.nodes_active is False:
@@ -385,16 +383,15 @@ class ControllerBenchmark:
             return result
 
         # set parameters to controller server
-        if parameters is None:
-            parameters = self.default_controller_params
-        self.logger.info(f'Setting parameters: {parameters}')
-        params_set = self.param_manager.set_parameters(parameters.to_dict())
-        if params_set is False:
-            msg = 'Failed to set parameters'
-            result.success = False
-            result.status_msg = msg
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result
+        if update_params is True:
+            self.logger.info(f'Setting parameters: {parameters}')
+            params_set = self.param_manager.set_parameters(parameters.to_dict())
+            if params_set is False:
+                msg = 'Failed to set parameters'
+                result.success = False
+                result.status_msg = msg
+                self.logger.error('Failed to run benchmark: %s', msg)
+                return result
 
         # change global and local map
         if update_map is True:
@@ -404,28 +401,8 @@ class ControllerBenchmark:
                 result.status_msg = msg
                 self.logger.error('Failed to run benchmark: %s', msg)
                 return result
-
-        # self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
-        # res = self.changeGlobalMap(mapdata.yaml_path)
-        # if res is False:
-        #     msg = 'Failed to change global map'
-        #     result.success = False
-        #     result.status_msg = msg
-        #     self.logger.error('Failed to run benchmark: %s', msg)
-        #     return result
-
-        # local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
-        # self.logger.info(f'Changing local map to: {local_map_path}')
-        # res = self.changeLocalMap(local_map_path)
-        # if res is False:
-        #     msg = 'Failed to change local map'
-        #     result.success = False
-        #     result.status_msg = msg
-        #     self.logger.error('Failed to run benchmark: %s', msg)
-        #     return result
-
-        # self.nav.clearAllCostmaps()
-        # time.sleep(0.5)
+            self.nav.clearAllCostmaps()
+            time.sleep(0.5)
 
         # getting start and goal pose
         self.logger.info('Generating robot start and goal pose.')
@@ -458,15 +435,14 @@ class ControllerBenchmark:
             result.status_msg = msg
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
-
-        # calculate timout for the global plan
         path_xy = np.array([
             (ps.pose.position.x, ps.pose.position.y) for ps in global_plan.poses])
-        # TODO: quaternion to radian
+
+        # TODO: quaternion to radian, necessary?
         path_omega = np.array([
             ps.pose.orientation.z for ps in global_plan.poses])
 
-        # TODO
+        # TODO: calculate timeout based on progress
         # distances = np.sqrt(np.sum(np.diff(path_xy, axis=0)**2, axis=1))
         # global_plan_length = np.sum(distances)
         # # calculate max time with min velocity
@@ -596,25 +572,33 @@ class ControllerBenchmark:
         return ControllerMetric(
             controller_name=result.controller_name,
             map_name=result.map_name,
+            uid=result.uid,
+
             time_elapsed=result.time_elapsed,
             success=result.success,
             distance_to_goal=distance_to_goal,
             angle_to_goal=angle_to_goal / np.pi * 180,  # rad to deg
+
             path_xy=result.path_xy,
+
             linear_velocity=result.cmd_vel_xy[:, 0],
             avg_linear_velocity=np.mean(result.cmd_vel_xy[:, 0]),
             max_linear_velocity=np.max(result.cmd_vel_xy[:, 0]),
             rms_linear_velocity=np.sqrt(np.mean(result.cmd_vel_xy[:, 0]**2)),
+
             linear_acceleration=acc_lin,
             avg_linear_acceleration=np.mean(acc_lin),
             max_linear_acceleration=np.max(acc_lin),
             rms_linear_acceleration=np.sqrt(np.mean(acc_lin**2)),
+
             max_angular_acceleration=np.max(acc_ang),
             avg_angular_acceleration=np.mean(acc_ang),
+
             linear_jerks=jerk_lin,
             rms_linear_jerk=rms_lin_jerk,
             angular_jerks=jerk_ang,
             rms_angular_jerk=rms_ang_jerk,
+
             path_costs=result.path_costs,
             sum_of_costs=np.sum(result.path_costs),
             avg_cost=np.mean(result.path_costs),
