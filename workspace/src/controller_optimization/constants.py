@@ -1,6 +1,9 @@
 # paths
-BASE_PATH = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization'
-LAUNCH_PATH = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_launch'
+REPO_PATH = '/home/turtlewizard/thesis-mppi-model-ident'
+BASE_PATH = REPO_PATH + '/workspace/src/controller_optimization'
+LAUNCH_PATH = REPO_PATH + '/workspace/src/controller_launch'
+OPTIMIZATION_RESULTS_PATH = REPO_PATH + '/optimization_results'
+CONFIG_PATH = REPO_PATH + '/workspace/src/controller_optimization/config'
 
 DEFAULT_MPPI_CRITIC_NAMES = [
     'ConstraintCritic', 'GoalCritic', 'GoalAngleCritic', 'PreferForwardCritic',

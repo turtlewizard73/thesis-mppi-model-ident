@@ -15,7 +15,6 @@ from matplotlib.figure import Figure
 import cv2
 import numpy as np
 import pickle
-import glob
 
 # ros imports
 import rclpy

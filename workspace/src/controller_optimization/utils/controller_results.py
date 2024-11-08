@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-# common imports
 from dataclasses import dataclass, field
 import numpy as np
 from typing import Dict
@@ -24,7 +23,7 @@ class ControllerResult:
     #    -> pose - geometry_msgs/Pose
     #      -> position - geometry_msgs/Point
     #        -> x, y - float64
-    # TODO -> orientation - geometry_msgs/Quaternion
+    #    -> orientation - geometry_msgs/Quaternion
     #        -> x, y, z, w - float64
     path_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
     path_omega: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
@@ -35,7 +34,7 @@ class ControllerResult:
     #    -> pose - geometry_msgs/Pose
     #      -> position - geometry_msgs/Point
     #        -> x, y - float64
-    # TODO -> orientation - geometry_msgs/Quaternion
+    #      -> orientation - geometry_msgs/Quaternion
     #        -> x, y, z, w - float64
     odom_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
     odom_omega: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
