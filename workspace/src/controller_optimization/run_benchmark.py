@@ -3,13 +3,15 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+
+import constants
 from controller_benchmark import ControllerBenchmark
 from utils.util_functions import setup_run
 from utils.controller_results import ControllerResult
-from utils.controller_parameters import MPPIControllerParameters
+from utils.controller_parameters import ControllerParameters
 
-BASE_PATH = os.path.dirname(__file__)
-LAUNCH_PATH = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_launch'
+BASE_PATH = constants.BASE_PATH
+LAUNCH_PATH = constants.LAUNCH_PATH
 global logger, controller_benchmark
 
 
@@ -55,16 +57,15 @@ def main():
         log_file_path=os.path.join(BASE_PATH, 'logs')
     )
 
-    default_mppi_params = MPPIControllerParameters()
+    controller_benchmark = ControllerBenchmark(
+        logger=logger,
+        config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'))
+
+    default_mppi_params = ControllerParameters()
     default_mppi_params.load_from_yaml(
         os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
 
-    logger.info("Default mppi parameters initialized: \n%s", default_mppi_params)
-
-    controller_benchmark = ControllerBenchmark(
-        logger=logger,
-        config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'),
-        mppi_params=default_mppi_params)
+    controller_benchmark.update_parameters(default_mppi_params)
     try:
         test_benchmark()
     except KeyboardInterrupt:

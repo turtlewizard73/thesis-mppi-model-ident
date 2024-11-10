@@ -5,16 +5,19 @@ import time
 import yaml
 import pickle
 from copy import deepcopy
+import pandas as pd
+import re
 
 import constants
 from controller_benchmark import ControllerBenchmark
 from utils.util_functions import setup_run
-from utils.controller_parameters import MPPIControllerParameters
+from utils.controller_parameters import ControllerParameters
 from utils.controller_metrics import ControllerMetric
 
-BASE_PATH = os.path.dirname(__file__)
-LAUNCH_PATH = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_launch'
-global logger, default_mppi_params, controller_benchmark
+BASE_PATH = constants.BASE_PATH
+LAUNCH_PATH = constants.LAUNCH_PATH
+OPTIMIZATION_OUTPUT_PATH = constants.OPTIMIZATION_OUTPUT_PATH
+global logger, benchmark
 
 
 def score_random_search(metric: ControllerMetric) -> float:
@@ -41,141 +44,160 @@ def score_random_search(metric: ControllerMetric) -> float:
         weight_angle * normalized_angle_to_goal
     )
 
-    return score
+    return float(score)
 
 
-def random_search():
-    global default_mppi_params, controller_benchmark, logger
+def run_benchmark_trial(
+        params: ControllerParameters, trial_id: str, timeout: float):
+    """Runs a single benchmark trial with the given parameters."""
+    global benchmark, logger
+
+    benchmark.update_parameters(params)
+    result = benchmark.run_benchmark(run_uid=trial_id, timeout=timeout)
+
+    if not result.success:
+        logger.error(f"Trial {trial_id} failed: {result.status_msg}")
+        return {
+            'id': trial_id,
+            'success': False,
+            'score': 0.0,
+            'time_elapsed': 0.0,
+            'avg_cost': 0.0,
+            'distance_to_goal': 0.0,
+            'angle_to_goal': 0.0,
+            'msg': result.status_msg,
+            'metric_path': 'None'
+        }
+
+    metric = benchmark.calculate_metric(result)
+    metric_path = benchmark.save_metric(metric)
+    score = score_random_search(metric)
+
+    logger.info(f"Trial {trial_id} finished with score: {score}.")
+    return {
+        'id': trial_id,
+        'success': True,
+        'score': score,
+        'time_elapsed': metric.time_elapsed,
+        'avg_cost': metric.avg_cost,
+        'distance_to_goal': metric.distance_to_goal,
+        'angle_to_goal': metric.angle_to_goal,
+        'msg': result.status_msg,
+        'metric_path': metric_path
+    }
+
+
+def main():
+    global logger, default_mppi_params, benchmark
+    logger = setup_run('Search', os.path.join(BASE_PATH, 'logs'))
     stamp = time.strftime('%Y-%m-%d-%H-%M')
-    working_dir = os.path.join(
-        BASE_PATH, 'optimization_results', f'random_search_{stamp}')
-    if not os.path.exists(working_dir):
-        os.makedirs(working_dir)
-    working_metrics_dir = os.path.join(working_dir, 'metrics')
-    if not os.path.exists(working_metrics_dir):
-        os.makedirs(working_metrics_dir)
+    WORK_DIR = os.path.join(OPTIMIZATION_OUTPUT_PATH, f'random_search_{stamp}')
+    output_csv = os.path.join(WORK_DIR, 'output_result.csv')
+    output_rows = []
 
-    logger.info(f"Starting random search, output: {working_dir}.")
-    controller_benchmark.launch_nodes()
+    benchmark = ControllerBenchmark(
+        logger=logger.getChild('Benchmark'),
+        config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'),
+        result_save_path=os.path.join(WORK_DIR, 'results'),
+        metric_save_path=os.path.join(WORK_DIR, 'metrics'))
 
-    # run the benchmark with default config to get the reference metric
-    result = controller_benchmark.run_benchmark()
-    result.uid = 'reference'
-    reference_metric = controller_benchmark.calculate_metric(result)
-    reference_metric.uid = 'reference'
-    reference_score = score_random_search(reference_metric)
+    # Initialize default controller parameters
+    default_mppi_params = ControllerParameters()
+    default_mppi_params.load_from_yaml(os.path.join(
+        LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
 
-    # setup the random search
-    num_trials = 5
-    timeout = reference_metric.time_elapsed * 2
-    best_score = reference_score
+    # run default benchmark
+    benchmark.launch_nodes()
+    benchmark.update_parameters(default_mppi_params)
+    ref_result = benchmark.run_benchmark(run_uid='reference')
+
+    if ref_result.success is False:
+        logger.error(f"Failed to run benchmark: {ref_result.status_msg}")
+        return 1
+
+    ref_metric = benchmark.calculate_metric(ref_result)
+    ref_score = score_random_search(ref_metric)
+    ref_metric_path = benchmark.save_metric(ref_metric)
+
+    ref_output_dict = {
+        'id': 'reference',
+        'success': True,
+        'score': ref_score,
+        'time_elapsed': ref_metric.time_elapsed,
+        'avg_cost': ref_metric.avg_cost,
+        'distance_to_goal': ref_metric.distance_to_goal,
+        'angle_to_goal': ref_metric.angle_to_goal,
+        'msg': ref_result.status_msg,
+        'metric_path': ref_metric_path,
+        **default_mppi_params.to_dict()
+    }
+    output_rows.append(ref_output_dict)
+    output_df = pd.DataFrame(output_rows).to_csv(output_csv, index=False)
+
+    # setup search parameters
+    TIMEOUT = ref_metric.time_elapsed * 2
+    num_trials = 30
+
+    best_score = ref_score
     best_params = deepcopy(default_mppi_params)
-    best_metric_path = ''
-    test_mppi_params = deepcopy(default_mppi_params)
+    best_metric_path = ref_metric_path
 
-    loop_start_time = time.time()
-    successful_trials = 0
+    test_params = ControllerParameters()
+    benchmark.update_map('complex_ref')
+
     try:
-        for i in range(num_trials):
-            start_time = time.time()
-            logger.info(f'______ Start Trial {i}/{num_trials} ______')
-            score = 0.0
-            filename = f'output_{i}.yaml'
-            metric_path = os.path.join(working_dir, f'metric_{i}.pickle')
-
-            # generate parameters
-            test_mppi_params.randomize_weights(
+        loop_start_time = time.time()
+        successful_trials = 0
+        for i in range(1, num_trials + 1):
+            # get new parameters
+            test_params.randomize_weights(
                 distribution='uniform', lower_bound=0.1, upper_bound=100.0,
                 decimals=0)
-            # run simulation and get metrics
-            result = controller_benchmark.run_benchmark(
-                parameters=test_mppi_params, timeout=timeout)
-            result.uid = f'trial_{i}'
+            logger.info(f"___ Starting trial {i}/{num_trials} ___")
 
-            if result.success is True:
+            trial_result = run_benchmark_trial(test_params, i, TIMEOUT)
+            if trial_result['success'] is True:
                 successful_trials += 1
-                metric = controller_benchmark.calculate_metric(result)
-                metric.uid = f'trial_{i}'
-                score = score_random_search(metric)
 
-                # evaluate performance and update best parameters if needed
-                if score < best_score:
-                    best_score = score
-                    best_params = deepcopy(test_mppi_params)
-                    best_metric_path = metric_path
+            if trial_result['success'] is True and (trial_result['score'] < best_score):
+                best_score = trial_result['score']
+                best_params = deepcopy(test_params)
+                best_metric_path = trial_result['metric_path']
 
-                # save the metric
-                with open(metric_path, 'wb+') as f:
-                    pickle.dump(reference_metric, f, pickle.HIGHEST_PROTOCOL)
-            else:
-                filename = f'output_{i}_failed.yaml'
-
-            end_time = time.time()
-
-            # save the output (parameters...)
-
-            with open(os.path.join(working_dir, filename), 'w') as f:
-                output_dict = {
-                    'score': float(score),
-                    'msg': str(result.status_msg),
-                    'time': end_time - start_time,
-                    'parameters': test_mppi_params.to_dict(),
-                    'metric_path': metric_path}
-                yaml.dump(output_dict, f, default_flow_style=False)
+            new_row = {**trial_result, **test_params.to_dict()}
+            output_rows.append(new_row)
+            pd.DataFrame([new_row]).to_csv(output_csv, mode='a', header=False, index=False)
 
             logger.info(
-                f'______ Trial {i}/{num_trials} - Score: {score} finished in {end_time - start_time} s. ______')
+                f"___ Trial {i}/{num_trials} finished with score: {trial_result['score']} ___")
 
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, stopping.")
     except Exception as e:
-        logger.error(f"Error in trial: {e}")
+        logger.error(f"Error in main: {e}")
+    finally:
+        pd.DataFrame(output_rows).to_csv(os.path.join(
+            WORK_DIR, 'output_result_final.csv'), index=False)
 
-    reference_metric_path = os.path.join(working_metrics_dir, f'reference_metric_{stamp}.pickle')
-    with open(reference_metric_path, 'wb+') as f:
-        pickle.dump(reference_metric, f, pickle.HIGHEST_PROTOCOL)
+        with open(os.path.join(WORK_DIR, 'output_0_result.yaml'), 'w') as f:
+            yaml.dump({
+                'num_trials': num_trials,
+                'successful_trials': successful_trials,
+                'timeout': TIMEOUT,
+                'loop_time': time.time() - loop_start_time,
+                'best_score': float(best_score),
+                'best_parameters': best_params.to_dict(),
+                'best_metric_path': best_metric_path,
+                'reference_score': float(ref_score),
+                'reference_parameters': default_mppi_params.to_dict(),
+                'reference_metric_path': ref_metric_path
+            }, f, default_flow_style=False)
 
-    with open(os.path.join(working_dir, 'output_0_result.yaml'), 'w') as f:
-        result_dict = {
-            'num_trials': num_trials,
-            'successful_trials': successful_trials,
-            'timeout': timeout,
-            'loop_time': time.time() - loop_start_time,
-            'best_score': float(best_score),
-            'best_parameters': best_params.to_dict(),
-            'best_metric_path': best_metric_path,
-            'reference_score': float(reference_score),
-            'reference_parameters': controller_benchmark.default_controller_params.to_dict(),
-            'reference_metric_path': reference_metric_path}
-        yaml.dump(result_dict, f, default_flow_style=False)
+        del benchmark
 
-
-def main():
-    global logger, default_mppi_params, controller_benchmark
-    logger = setup_run(
-        logger_name='ControllerOptimizer',
-        log_file_path=os.path.join(BASE_PATH, 'logs')
-    )
-
-    # Initialize default controller parameters
-    default_mppi_params = MPPIControllerParameters()
-    default_mppi_params.load_from_yaml(
-        os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
-
-    logger.info("Default mppi parameters initialized: \n%s", default_mppi_params)
-
-    controller_benchmark = ControllerBenchmark(
-        logger=logger,
-        config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'),
-        mppi_params=default_mppi_params)
-
-    try:
-        random_search()
-    except KeyboardInterrupt:
-        logger.info("Keyboard interrupt, stopping.")
-
-    exit(0)
+        time.sleep(5)
+        return 0
 
 
 if __name__ == '__main__':
-    main()
+    exit(main())

@@ -15,7 +15,6 @@ from matplotlib.figure import Figure
 import cv2
 import numpy as np
 import pickle
-import glob
 
 # ros imports
 import rclpy
@@ -31,10 +30,15 @@ from nav2_msgs.srv import LoadMap
 import rclpy.time
 from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
+
+import constants
 from utils.controller_results import ControllerResult
 from utils.controller_metrics import ControllerMetric
-from utils.controller_parameters import MPPIControllerParameters
+from utils.controller_parameters import ControllerParameters
 from utils.parameter_manager import ParameterManager
+
+BASE_PATH = constants.BASE_PATH
+REPO_PATH = constants.REPO_PATH
 
 
 @dataclass
@@ -51,32 +55,28 @@ class MapData:
 
 
 class ControllerBenchmark:
-    BASE_PATH = os.path.dirname(__file__)
-    RESULTS_PATH = os.path.join(BASE_PATH, 'results')
-    METRICS_PATH = os.path.join(BASE_PATH, 'metrics')
-    COSTMAP_RESOLUTION = 0.05  # TODO: get from costmap
-
     def __init__(
-            self, logger, config_path: str,
-            mppi_params: MPPIControllerParameters, base_path: str = '') -> None:
+            self, logger,
+            config_path: str,
+            result_save_path: str = constants.RESULTS_PATH,
+            metric_save_path: str = constants.METRICS_PATH) -> None:
+        self.logger = logger
         self.nodes_active = False
 
-        if base_path != '':
-            ControllerBenchmark.BASE_PATH = base_path
-        # create directories
-        if os.path.isdir(ControllerBenchmark.RESULTS_PATH) is False:
-            os.makedirs(ControllerBenchmark.RESULTS_PATH)
-        if os.path.isdir(ControllerBenchmark.METRICS_PATH) is False:
-            os.makedirs(ControllerBenchmark.METRICS_PATH)
+        if os.path.isdir(result_save_path) is False:
+            os.makedirs(result_save_path)
+        self.result_save_path = result_save_path
 
-        self.logger = logger
+        if os.path.isdir(metric_save_path) is False:
+            os.makedirs(metric_save_path)
+        self.metric_save_path = metric_save_path
+
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
 
         self.config_path = config_path
-        self.default_controller_params = mppi_params
         self.params: Dict = {}
-        self.mapdata: MapData = None
+        self.mapdata_dict: Dict[str, MapData] = {}
         self.load_config()
 
         self.nodes: Dict = {}
@@ -87,7 +87,8 @@ class ControllerBenchmark:
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
 
-        self.update_map(self.mapdata)
+        self.update_map(self.params['reference_map'])
+        self.launch_nodes()
 
         self.results: List[ControllerResult] = []
 
@@ -115,47 +116,50 @@ class ControllerBenchmark:
             self.params['odom_topic'] = data['odom_topic']
             self.params['costmap_topic'] = data['costmap_topic']
             self.params['mppi_critic_topic'] = data['mppi_critic_topic']
+            self.params['reference_map'] = data['reference_map']
 
-            map_name = data['map']
-            start = PoseStamped()
-            start.header.frame_id = 'map'
-            start.pose.position.x = data.get(map_name)['start_pose']['x']
-            start.pose.position.y = data.get(map_name)['start_pose']['y']
-            yaw = data.get(map_name)['start_pose']['yaw']
-            start.pose.orientation = yaw2quat(yaw)
+            map_names = data['maps']
+            for map_name in map_names:
+                start = PoseStamped()
+                start.header.frame_id = 'map'
+                start.pose.position.x = data.get(map_name)['start_pose']['x']
+                start.pose.position.y = data.get(map_name)['start_pose']['y']
+                yaw = data.get(map_name)['start_pose']['yaw']
+                start.pose.orientation = yaw2quat(yaw)
 
-            goal = PoseStamped()
-            goal.header.frame_id = 'map'
-            goal.pose.position.x = data.get(map_name)['goal_pose']['x']
-            goal.pose.position.y = data.get(map_name)['goal_pose']['y']
-            yaw = data.get(map_name)['goal_pose']['yaw']
-            goal.pose.orientation = yaw2quat(yaw)
+                goal = PoseStamped()
+                goal.header.frame_id = 'map'
+                goal.pose.position.x = data.get(map_name)['goal_pose']['x']
+                goal.pose.position.y = data.get(map_name)['goal_pose']['y']
+                yaw = data.get(map_name)['goal_pose']['yaw']
+                goal.pose.orientation = yaw2quat(yaw)
 
-            self.mapdata = MapData(
-                name=map_name,
-                yaml_path=os.path.join(
-                    ControllerBenchmark.BASE_PATH, data.get(map_name)['path']),
-                start=start,
-                goal=goal)
+                mapdata = MapData(
+                    name=map_name,
+                    yaml_path=os.path.join(
+                        BASE_PATH, data.get(map_name)['path']),
+                    start=start,
+                    goal=goal)
 
-            # local is optional
-            if data.get(map_name).get('path_local') is not None:
-                self.mapdata.yaml_path_local = os.path.join(
-                    ControllerBenchmark.BASE_PATH, data.get(map_name)['path_local'])
-            else:
-                self.mapdata.yaml_path_local = self.mapdata.yaml_path
+                # local is optional
+                if data.get(map_name).get('path_local') is not None:
+                    mapdata.yaml_path_local = os.path.join(
+                        BASE_PATH, data.get(map_name)['path_local'])
+                else:
+                    mapdata.yaml_path_local = mapdata.yaml_path
 
-        map_config_path = os.path.join(
-            ControllerBenchmark.BASE_PATH, self.mapdata.yaml_path)
-        with open(map_config_path, 'r', encoding='utf-8') as file:
-            map_config = yaml.safe_load(file)
-            self.mapdata.resolution = map_config['resolution']
-            self.mapdata.origin = np.array(
-                [[map_config['origin'][0], map_config['origin'][1]]])
+                map_config_path = os.path.join(
+                    BASE_PATH, mapdata.yaml_path)
+                with open(map_config_path, 'r', encoding='utf-8') as file:
+                    map_config = yaml.safe_load(file)
+                    mapdata.resolution = map_config['resolution']
+                    mapdata.origin = np.array(
+                        [[map_config['origin'][0], map_config['origin'][1]]])
+                self.mapdata_dict[map_name] = mapdata
 
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Config: \n {pformat(self.params)}')
-            self.logger.debug(f'Map: \n {pformat(self.mapdata)}')
+            self.logger.debug(f'Map: \n {pformat(self.mapdata_dict)}')
 
     @timing_decorator(
         lambda self: self.logger.info('Initializing nodes...'),
@@ -177,10 +181,6 @@ class ControllerBenchmark:
         # init cmd_vel subscriber
         self.cmd_vel_sub = util_nodes.CmdVelSubscriber(self.params['cmd_vel_topic'])
         self.nodes['cmd_vel_sub'] = self.cmd_vel_sub
-        # init costmap subscriber
-        # self.costmap_sub = util_nodes.CostmapSubscriber(
-        #     topic=self.params['costmap_topic'])
-        # self.nodes['costmap_sub'] = self.costmap_sub
         # init mppi critic subscriber
         self.mppi_critic_sub = util_nodes.MPPICriticSubscriber(self.params['mppi_critic_topic'])
         self.nodes['mppi_critic_sub'] = self.mppi_critic_sub
@@ -232,32 +232,51 @@ class ControllerBenchmark:
         self.nav.info('Change local map request was successful!')
         return True
 
-    def update_map(self, mapdata: MapData) -> Tuple[bool, str]:
+    def update_map(self, mapname: str) -> bool:
+        mapdata = self.mapdata_dict[mapname]
+
         self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
         res = self.changeGlobalMap(mapdata.yaml_path)
         if res is False:
-            msg = 'Failed to change global map'
-            result = False
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result, msg
+            self.logger.error('Failed to change global map')
+            return False
 
         local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
         self.logger.info(f'Changing local map to: {local_map_path}')
         res = self.changeLocalMap(local_map_path)
         if res is False:
-            msg = 'Failed to change local map'
-            result = False
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result, msg
+            self.logger.error('Failed to change local map')
+            return False
 
+        self.current_mapdata = mapdata
         self.nav.clearAllCostmaps()
         time.sleep(0.5)
-        return True, 'Maps updated'
+        return True
+
+    def update_parameters(self, parameters: ControllerParameters) -> bool:
+        self.logger.info(f'Setting parameters: {parameters}')
+        controller_name = parameters.controller_name
+        critics_dict = {}
+        for critic in parameters.critics:
+            critics_dict.update({
+                f'{controller_name}.{critic.name}.cost_weight': critic.cost_weight,
+                f'{controller_name}.{critic.name}.cost_power': critic.cost_power
+            })
+
+        params_set = self.param_manager.set_parameters(parameters.to_dict())
+        if params_set is False:
+            self.logger.error('Failed to set parameters')
+            return False
+        return True
 
     @timing_decorator(
         lambda self: self.logger.info('Launching nodes...'),
         lambda self, ex_time: self.logger.info(f'Launched nodes in {ex_time:.4f} seconds.'))
     def launch_nodes(self):
+        if self.nodes_active is True:
+            self.logger.warn('Nodes are already active')
+            return
+
         try:
             for name, node in self.nodes.items():
                 sub_executor = rclpy.executors.MultiThreadedExecutor()
@@ -364,17 +383,13 @@ class ControllerBenchmark:
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
     def run_benchmark(
-            self, parameters: MPPIControllerParameters = None, mapdata: MapData = None,
-            timeout: float = None, store_result: bool = False) -> ControllerResult:
+            self, run_uid: str = '', timeout: float = None, store_result: bool = False) -> ControllerResult:
         # _____________________ BENCHMARK SETUP _____________________
-        update_map = False
-        if mapdata is None:
-            mapdata = self.mapdata
-        else:
-            update_map = True
-
+        mapdata = self.current_mapdata
         result = ControllerResult(
-            controller_name=self.params['controller'], map_name=mapdata.name)
+            controller_name=self.params['controller'],
+            map_name=mapdata.name,
+            uid=run_uid)
 
         # check if nodes are active
         if self.nodes_active is False:
@@ -383,49 +398,6 @@ class ControllerBenchmark:
             result.status_msg = msg
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
-
-        # set parameters to controller server
-        if parameters is None:
-            parameters = self.default_controller_params
-        self.logger.info(f'Setting parameters: {parameters}')
-        params_set = self.param_manager.set_parameters(parameters.to_dict())
-        if params_set is False:
-            msg = 'Failed to set parameters'
-            result.success = False
-            result.status_msg = msg
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result
-
-        # change global and local map
-        if update_map is True:
-            success, msg = self.update_map(mapdata)
-            if success is False:
-                result.success = False
-                result.status_msg = msg
-                self.logger.error('Failed to run benchmark: %s', msg)
-                return result
-
-        # self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
-        # res = self.changeGlobalMap(mapdata.yaml_path)
-        # if res is False:
-        #     msg = 'Failed to change global map'
-        #     result.success = False
-        #     result.status_msg = msg
-        #     self.logger.error('Failed to run benchmark: %s', msg)
-        #     return result
-
-        # local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
-        # self.logger.info(f'Changing local map to: {local_map_path}')
-        # res = self.changeLocalMap(local_map_path)
-        # if res is False:
-        #     msg = 'Failed to change local map'
-        #     result.success = False
-        #     result.status_msg = msg
-        #     self.logger.error('Failed to run benchmark: %s', msg)
-        #     return result
-
-        # self.nav.clearAllCostmaps()
-        # time.sleep(0.5)
 
         # getting start and goal pose
         self.logger.info('Generating robot start and goal pose.')
@@ -458,15 +430,14 @@ class ControllerBenchmark:
             result.status_msg = msg
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
-
-        # calculate timout for the global plan
         path_xy = np.array([
             (ps.pose.position.x, ps.pose.position.y) for ps in global_plan.poses])
-        # TODO: quaternion to radian
+
+        # TODO: quaternion to radian, necessary?
         path_omega = np.array([
             ps.pose.orientation.z for ps in global_plan.poses])
 
-        # TODO
+        # TODO: calculate timeout based on progress
         # distances = np.sqrt(np.sum(np.diff(path_xy, axis=0)**2, axis=1))
         # global_plan_length = np.sum(distances)
         # # calculate max time with min velocity
@@ -596,49 +567,70 @@ class ControllerBenchmark:
         return ControllerMetric(
             controller_name=result.controller_name,
             map_name=result.map_name,
+            uid=result.uid,
+
             time_elapsed=result.time_elapsed,
             success=result.success,
             distance_to_goal=distance_to_goal,
             angle_to_goal=angle_to_goal / np.pi * 180,  # rad to deg
+
             path_xy=result.path_xy,
+
             linear_velocity=result.cmd_vel_xy[:, 0],
             avg_linear_velocity=np.mean(result.cmd_vel_xy[:, 0]),
             max_linear_velocity=np.max(result.cmd_vel_xy[:, 0]),
             rms_linear_velocity=np.sqrt(np.mean(result.cmd_vel_xy[:, 0]**2)),
+
             linear_acceleration=acc_lin,
             avg_linear_acceleration=np.mean(acc_lin),
             max_linear_acceleration=np.max(acc_lin),
             rms_linear_acceleration=np.sqrt(np.mean(acc_lin**2)),
+
             max_angular_acceleration=np.max(acc_ang),
             avg_angular_acceleration=np.mean(acc_ang),
+
             linear_jerks=jerk_lin,
             rms_linear_jerk=rms_lin_jerk,
             angular_jerks=jerk_ang,
             rms_angular_jerk=rms_ang_jerk,
+
             path_costs=result.path_costs,
             sum_of_costs=np.sum(result.path_costs),
             avg_cost=np.mean(result.path_costs),
             rms_cost=np.sqrt(np.mean(result.path_costs**2))
         )
 
-    def save_result(self, result: ControllerResult, sub_folder: str = '') -> None:
+    def save_result(
+            self, result: ControllerResult,
+            output_dir: str = '', uid: str = '') -> str:
         self.logger.info(f'Saving result: {result.map_name}.')
+        output_dir = output_dir if output_dir != '' else \
+            self.result_save_path
 
-        stamp = time.strftime(self.params['timestamp_format'])
-        filename = f'controller_benchmark_result_{stamp}.pickle'
-        save_path = os.path.join(ControllerBenchmark.RESULTS_PATH, sub_folder)
-        if os.path.isdir(save_path) is False:
-            self.logger.info(f'Creating directory: {save_path}')
-            os.makedirs(save_path)
+        if os.path.isdir(output_dir) is False:
+            os.makedirs(output_dir)
 
-        with open(os.path.join(save_path, filename), 'wb+') as f:
+        uid = uid if uid != '' else time.strftime(self.params['timestamp_format'])
+        filename = f'result_{uid}.pickle'
+
+        save_path = os.path.join(output_dir, filename)
+        with open(save_path, 'wb+') as f:
             pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
-        self.logger.info(f'Written results to: {filename}')
+
+        # save in the output_dir the path to the result
+        with open(os.path.join(output_dir, 'last_result.txt'), 'w') as f:
+            f.write(save_path)
+
+        self.logger.info(f'Written results to: {save_path}')
+        return save_path
 
     def load_result(self, path: str) -> ControllerResult:
         self.logger.info(f'Loading result: {path}.')
+        if not path.endswith('.pickle'):
+            raise ValueError('Path must end with .pickle')
+
         if os.path.isfile(path) is False:
-            raise ValueError(f'Invalid path to results file: {path}')
+            raise FileNotFoundError(f'Invalid path to results file: {path}')
 
         with open(path, 'rb') as file:
             result: ControllerResult = pickle.load(file)
@@ -646,25 +638,50 @@ class ControllerBenchmark:
         return result
 
     def load_last_result(self) -> ControllerResult:
-        results_files = glob.glob(os.path.join(
-            self.RESULTS_PATH, 'controller_benchmark_result_*.pickle'))
-        latest_file_path = max(results_files, key=os.path.getctime)
-        return self.load_result(latest_file_path)
+        latest_result_txt = os.path.join(
+            self.result_save_path, 'last_result.txt')
 
-    def save_metric(self, metric: ControllerMetric, path: str = None) -> None:
-        stamp = time.strftime(self.params['timestamp_format'])
-        filename = f'metric_{stamp}.pickle'
-        self.logger.info(f'Saving metric: {filename}.')
-        save_path = path if path is not None else os.path.join(
-            ControllerBenchmark.METRICS_PATH, filename)
+        if os.path.isfile(latest_result_txt) is False:
+            raise FileNotFoundError(f'File not found: {latest_result_txt}')
+
+        with open(os.path.join(ControllerBenchmark.RESULTS_PATH, 'last_result.txt'), 'r') as f:
+            last_result_path = f.read().strip()
+
+        if os.path.isfile(last_result_path) is False:
+            raise FileNotFoundError(f'Invalid path to results file: {last_result_path}')
+
+        return self.load_result(last_result_path)
+
+    def save_metric(
+            self, metric: ControllerMetric,
+            output_dir: str = '', uid: str = '') -> str:
+        self.logger.info(f'Saving result: {metric.map_name}.')
+        output_dir = output_dir if output_dir != '' else self.metric_save_path
+
+        if os.path.isdir(output_dir) is False:
+            os.makedirs(output_dir)
+
+        uid = uid if uid != '' else time.strftime(self.params['timestamp_format'])
+        filename = f'result_{uid}.pickle'
+
+        save_path = os.path.join(output_dir, filename)
         with open(save_path, 'wb+') as f:
             pickle.dump(metric, f, pickle.HIGHEST_PROTOCOL)
-        self.logger.info(f'Written metric to: {filename}')
+
+        # save in the output_dir the path to the result
+        with open(os.path.join(output_dir, 'last_metric.txt'), 'w') as f:
+            f.write(save_path)
+
+        self.logger.info(f'Written results to: {save_path}')
+        return save_path
 
     def load_metric(self, path: str) -> ControllerMetric:
         self.logger.info(f'Loading metric: {path}.')
+        if not path.endswith('.pickle'):
+            raise ValueError('Path must end with .pickle')
+
         if os.path.isfile(path) is False:
-            raise ValueError(f'Invalid path to metric file: {path}')
+            raise FileNotFoundError(f'Invalid path to results file: {path}')
 
         with open(path, 'rb') as file:
             metric: ControllerMetric = pickle.load(file)
@@ -672,10 +689,18 @@ class ControllerBenchmark:
         return metric
 
     def load_last_metric(self) -> ControllerMetric:
-        metrics_files = glob.glob(os.path.join(
-            self.METRICS_PATH, 'metric_*.pickle'))
-        latest_file_path = max(metrics_files, key=os.path.getctime)
-        return self.load_metric(latest_file_path)
+        latest_metric_txt = os.path.join(self.metric_save_path, 'last_metric.txt')
+
+        if os.path.isfile(latest_metric_txt) is False:
+            raise FileNotFoundError(f'File not found: {latest_metric_txt}')
+
+        with open(latest_metric_txt, 'r') as f:
+            last_metric_path = f.read().strip()
+
+        if os.path.isfile(last_metric_path) is False:
+            raise FileNotFoundError(f'Invalid path to metric file: {last_metric_path}')
+
+        return self.load_metric(last_metric_path)
 
     def plot_result(self, result: ControllerResult) -> Figure:
         self.logger.info('Generating result plot.')
@@ -693,13 +718,13 @@ class ControllerBenchmark:
         ax_plan.set_xlabel('x [m]')
         ax_plan.set_ylabel('y [m]')
 
-        map_path = self.mapdata.yaml_path.replace('.yaml', '.png')
-        map_resolution = self.mapdata.resolution
+        map_path = self.current_mapdata.yaml_path.replace('.yaml', '.png')
+        map_resolution = self.current_mapdata.resolution
         map_img = cv2.imread(os.path.join(
-            ControllerBenchmark.BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
+            BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
 
         height, width = map_img.shape
-        origin_x = self.mapdata.origin[0][0]
+        origin_x = self.current_mapdata.origin[0][0]
         rect_x_min = origin_x  # The minimum x coordinate of the rectangle
         rect_x_max = width * map_resolution + origin_x  # The maximum x coordinate of the rectangle
         rect_y_min = - height * map_resolution / 2  # The minimum y coordinate of the rectangle
@@ -751,13 +776,13 @@ class ControllerBenchmark:
         ax_plan.set_xlabel('x [m]')
         ax_plan.set_ylabel('y [m]')
 
-        map_path = self.mapdata.yaml_path.replace('.yaml', '.png')
-        map_resolution = self.mapdata.resolution
+        map_path = self.current_mapdata.yaml_path.replace('.yaml', '.png')
+        map_resolution = self.current_mapdata.resolution
         map_img = cv2.imread(os.path.join(
-            ControllerBenchmark.BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
+            BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
 
         height, width = map_img.shape
-        origin_x = self.mapdata.origin[0][0]
+        origin_x = self.current_mapdata.origin[0][0]
         rect_x_min = origin_x  # The minimum x coordinate of the rectangle
         rect_x_max = width * map_resolution + origin_x  # The maximum x coordinate of the rectangle
         rect_y_min = - height * map_resolution / 2  # The minimum y coordinate of the rectangle

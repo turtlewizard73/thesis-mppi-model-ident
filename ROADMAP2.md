@@ -90,3 +90,4 @@ output2: sum of costs on the path
 ## 2024. 11. 06.
 - done the costmap to avg cost part
   - fickung flipping
+  - grid search?

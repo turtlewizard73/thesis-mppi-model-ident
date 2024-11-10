@@ -26,6 +26,12 @@ def setup_run(
     args = parser.parse_args()
 
     # LOGGING
+    if not os.path.exists(log_file_path):
+        os.makedirs(log_file_path)
+    # log_file_path = os.path.join(log_file_path, logger_name.lower())
+    # if not os.path.exists(log_file_path):
+    #     os.makedirs(log_file_path)
+
     logging_level = logging.DEBUG if args.debug is True else logging.INFO
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging_level)

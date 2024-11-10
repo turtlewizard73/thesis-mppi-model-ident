@@ -2,11 +2,25 @@ from dataclasses import dataclass, field
 from typing import List, Any
 import yaml
 import numpy as np
+# from typing import TypedDict
 
 
 DEFAULT_MPPI_CRITIC_NAMES = [
     'ConstraintCritic', 'GoalCritic', 'GoalAngleCritic', 'PreferForwardCritic',
     'CostCritic', 'PathAlignCritic', 'PathFollowCritic', 'PathAngleCritic']
+
+
+# class ControllerCriticDict(TypedDict):
+#     """ControllerCritic dataclass."""
+#     # some critics have more options those are tuned by hand
+#     name: str
+#     cost_weight: float
+#     cost_power: float
+
+
+# class ControllerParametersDict(TypedDict):
+#     controller_name: str
+#     critics: List[ControllerCriticDict]
 
 
 @dataclass
@@ -19,34 +33,34 @@ class ControllerCritic:
 
 
 @dataclass
-class MPPIControllerParameters:
-    """MPPIController parameters dataclass."""
-    name: str = ''
-    critic_names: List[str] = field(
-        default_factory=lambda: DEFAULT_MPPI_CRITIC_NAMES)
-
+class ControllerParameters:
+    """Controller parameters dataclass."""
+    controller_name: str = 'FollowPathMPPI'
     critics: List[ControllerCritic] = field(
         default_factory=lambda: [ControllerCritic(n) for n in DEFAULT_MPPI_CRITIC_NAMES])
 
     def __str__(self):
         # print pretty the critics
-        critics_str = f'[MPPIControllerParameters] {self.name} critics:'
+        critics_str = f'[ControllerParameters] {self.controller_name} critics:'
         for critic in self.critics:
             critics_str += f'\n{critic.name}: {critic.cost_weight}, {critic.cost_power}'
 
         return critics_str
 
+    def set_critic_weight(self, critic_name: str, weight: float):
+        for critic in self.critics:
+            if critic.name == critic_name:
+                critic.cost_weight = float(weight)
+                return
+        raise ValueError(f'Critic {critic_name} not found in ControllerParameters.')
+
     def _find_mppi_controller(self, data: dict) -> Any:
-        """Recursively searches for the MPPIController configuration."""
-        search_key = 'nav2_mppi_controller::MPPIController'
+        """Recursively searches for the Controller configuration."""
         if isinstance(data, dict):
             for key, value in data.items():
-                if self.name != '' and key == self.name:
+                if key == self.controller_name:
                     return value
 
-                if isinstance(value, dict) and value.get('plugin') == search_key:
-                    self.name = key
-                    return value  # Return the whole dict for the MPPIController
                 # Recursively search in nested dictionaries
                 result = self._find_mppi_controller(value)
                 if result:
@@ -55,11 +69,14 @@ class MPPIControllerParameters:
         return None  # If not found
 
     def load_from_yaml(self, file_path: str):
-        """Loads the MPPIController parameters from a YAML file."""
+        """Loads the Controller parameters from a YAML file."""
+        print(f'Loading Controller parameters from {file_path}')
+
         with open(file_path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
 
             mppi_plugin_dict = self._find_mppi_controller(data)
+            print(mppi_plugin_dict)
 
             for critic in self.critics:
                 critic_dict = mppi_plugin_dict.get(critic.name)
@@ -70,15 +87,12 @@ class MPPIControllerParameters:
                     raise ValueError(f'No critic configuration found for {critic.name}.')
 
     def to_dict(self) -> dict:
-        """Converts the MPPIController parameters to a dictionary."""
-        if self.name == '':
-            raise ValueError('MPPIController name is not set.')
-
+        """Converts the Controller parameters to a dictionary."""
         mppi_dict = {}
         for critic in self.critics:
             mppi_dict.update({
-                f'{self.name}.{critic.name}.cost_weight': float(critic.cost_weight),
-                f'{self.name}.{critic.name}.cost_power': float(critic.cost_power)
+                f'{critic.name}.cost_weight': critic.cost_weight,
+                f'{critic.name}.cost_power': critic.cost_power
             })
 
         return mppi_dict
@@ -88,7 +102,7 @@ class MPPIControllerParameters:
             lower_bound: float = 0.01, upper_bound: float = 100.0,
             decimals: int = 1,
             avg=None, std_dev=None) -> None:
-        """Randomizes the MPPIController parameters."""
+        """Randomizes the Controller parameters."""
         for critic in self.critics:
             if distribution == 'uniform':
                 cost_weight = np.random.uniform(lower_bound, upper_bound)
@@ -98,4 +112,4 @@ class MPPIControllerParameters:
             else:
                 raise ValueError('Unsupported distribution or missing parameters.')
 
-            critic.cost_weight = np.round(cost_weight, decimals)
+            critic.cost_weight = float(np.round(cost_weight, decimals))
