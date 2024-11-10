@@ -8,9 +8,22 @@ odom_topic: /odom
 costmap_topic: /local_costmap/costmap
 mppi_critic_topic: /mppi_critic_scores
 # maps: [corridor_empty, corridor_mid_obstacles, corridor_side_obstacles]
-map: complex
+reference_map: complex_ref
+maps: [complex, complex_ref]
 complex:
   path: 'maps/complex.yaml'
+  path_local: 'maps/complex_local.yaml'
+  start_pose:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+  goal_pose:
+    x: 10.3
+    y: 0.0
+    yaw: 0.0
+complex_ref:
+  path: 'maps/complex.yaml'
+  # path_local: 'maps/complex_local.yaml'
   start_pose:
     x: 0.0
     y: 0.0

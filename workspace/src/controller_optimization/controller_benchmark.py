@@ -76,7 +76,7 @@ class ControllerBenchmark:
 
         self.config_path = config_path
         self.params: Dict = {}
-        self.mapdata: MapData = None
+        self.mapdata_dict: Dict[str, MapData] = {}
         self.load_config()
 
         self.nodes: Dict = {}
@@ -87,7 +87,8 @@ class ControllerBenchmark:
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
 
-        self.update_map(self.mapdata)
+        self.update_map(self.params['reference_map'])
+        self.launch_nodes()
 
         self.results: List[ControllerResult] = []
 
@@ -115,47 +116,50 @@ class ControllerBenchmark:
             self.params['odom_topic'] = data['odom_topic']
             self.params['costmap_topic'] = data['costmap_topic']
             self.params['mppi_critic_topic'] = data['mppi_critic_topic']
+            self.params['reference_map'] = data['reference_map']
 
-            map_name = data['map']
-            start = PoseStamped()
-            start.header.frame_id = 'map'
-            start.pose.position.x = data.get(map_name)['start_pose']['x']
-            start.pose.position.y = data.get(map_name)['start_pose']['y']
-            yaw = data.get(map_name)['start_pose']['yaw']
-            start.pose.orientation = yaw2quat(yaw)
+            map_names = data['maps']
+            for map_name in map_names:
+                start = PoseStamped()
+                start.header.frame_id = 'map'
+                start.pose.position.x = data.get(map_name)['start_pose']['x']
+                start.pose.position.y = data.get(map_name)['start_pose']['y']
+                yaw = data.get(map_name)['start_pose']['yaw']
+                start.pose.orientation = yaw2quat(yaw)
 
-            goal = PoseStamped()
-            goal.header.frame_id = 'map'
-            goal.pose.position.x = data.get(map_name)['goal_pose']['x']
-            goal.pose.position.y = data.get(map_name)['goal_pose']['y']
-            yaw = data.get(map_name)['goal_pose']['yaw']
-            goal.pose.orientation = yaw2quat(yaw)
+                goal = PoseStamped()
+                goal.header.frame_id = 'map'
+                goal.pose.position.x = data.get(map_name)['goal_pose']['x']
+                goal.pose.position.y = data.get(map_name)['goal_pose']['y']
+                yaw = data.get(map_name)['goal_pose']['yaw']
+                goal.pose.orientation = yaw2quat(yaw)
 
-            self.mapdata = MapData(
-                name=map_name,
-                yaml_path=os.path.join(
-                    BASE_PATH, data.get(map_name)['path']),
-                start=start,
-                goal=goal)
+                mapdata = MapData(
+                    name=map_name,
+                    yaml_path=os.path.join(
+                        BASE_PATH, data.get(map_name)['path']),
+                    start=start,
+                    goal=goal)
 
-            # local is optional
-            if data.get(map_name).get('path_local') is not None:
-                self.mapdata.yaml_path_local = os.path.join(
-                    BASE_PATH, data.get(map_name)['path_local'])
-            else:
-                self.mapdata.yaml_path_local = self.mapdata.yaml_path
+                # local is optional
+                if data.get(map_name).get('path_local') is not None:
+                    mapdata.yaml_path_local = os.path.join(
+                        BASE_PATH, data.get(map_name)['path_local'])
+                else:
+                    mapdata.yaml_path_local = mapdata.yaml_path
 
-        map_config_path = os.path.join(
-            BASE_PATH, self.mapdata.yaml_path)
-        with open(map_config_path, 'r', encoding='utf-8') as file:
-            map_config = yaml.safe_load(file)
-            self.mapdata.resolution = map_config['resolution']
-            self.mapdata.origin = np.array(
-                [[map_config['origin'][0], map_config['origin'][1]]])
+                map_config_path = os.path.join(
+                    BASE_PATH, mapdata.yaml_path)
+                with open(map_config_path, 'r', encoding='utf-8') as file:
+                    map_config = yaml.safe_load(file)
+                    mapdata.resolution = map_config['resolution']
+                    mapdata.origin = np.array(
+                        [[map_config['origin'][0], map_config['origin'][1]]])
+                self.mapdata_dict[map_name] = mapdata
 
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Config: \n {pformat(self.params)}')
-            self.logger.debug(f'Map: \n {pformat(self.mapdata)}')
+            self.logger.debug(f'Map: \n {pformat(self.mapdata_dict)}')
 
     @timing_decorator(
         lambda self: self.logger.info('Initializing nodes...'),
@@ -228,8 +232,8 @@ class ControllerBenchmark:
         self.nav.info('Change local map request was successful!')
         return True
 
-    def update_map(self, mapdata: MapData = None) -> bool:
-        mapdata = mapdata if mapdata is not None else self.mapdata
+    def update_map(self, mapname: str) -> bool:
+        mapdata = self.mapdata_dict[mapname]
 
         self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
         res = self.changeGlobalMap(mapdata.yaml_path)
@@ -244,6 +248,7 @@ class ControllerBenchmark:
             self.logger.error('Failed to change local map')
             return False
 
+        self.current_mapdata = mapdata
         self.nav.clearAllCostmaps()
         time.sleep(0.5)
         return True
@@ -268,6 +273,10 @@ class ControllerBenchmark:
         lambda self: self.logger.info('Launching nodes...'),
         lambda self, ex_time: self.logger.info(f'Launched nodes in {ex_time:.4f} seconds.'))
     def launch_nodes(self):
+        if self.nodes_active is True:
+            self.logger.warn('Nodes are already active')
+            return
+
         try:
             for name, node in self.nodes.items():
                 sub_executor = rclpy.executors.MultiThreadedExecutor()
@@ -376,10 +385,10 @@ class ControllerBenchmark:
     def run_benchmark(
             self, run_uid: str = '', timeout: float = None, store_result: bool = False) -> ControllerResult:
         # _____________________ BENCHMARK SETUP _____________________
-        mapdata = self.mapdata
+        mapdata = self.current_mapdata
         result = ControllerResult(
             controller_name=self.params['controller'],
-            map_name=self.mapdata.name,
+            map_name=mapdata.name,
             uid=run_uid)
 
         # check if nodes are active
@@ -709,13 +718,13 @@ class ControllerBenchmark:
         ax_plan.set_xlabel('x [m]')
         ax_plan.set_ylabel('y [m]')
 
-        map_path = self.mapdata.yaml_path.replace('.yaml', '.png')
-        map_resolution = self.mapdata.resolution
+        map_path = self.current_mapdata.yaml_path.replace('.yaml', '.png')
+        map_resolution = self.current_mapdata.resolution
         map_img = cv2.imread(os.path.join(
             BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
 
         height, width = map_img.shape
-        origin_x = self.mapdata.origin[0][0]
+        origin_x = self.current_mapdata.origin[0][0]
         rect_x_min = origin_x  # The minimum x coordinate of the rectangle
         rect_x_max = width * map_resolution + origin_x  # The maximum x coordinate of the rectangle
         rect_y_min = - height * map_resolution / 2  # The minimum y coordinate of the rectangle
@@ -767,13 +776,13 @@ class ControllerBenchmark:
         ax_plan.set_xlabel('x [m]')
         ax_plan.set_ylabel('y [m]')
 
-        map_path = self.mapdata.yaml_path.replace('.yaml', '.png')
-        map_resolution = self.mapdata.resolution
+        map_path = self.current_mapdata.yaml_path.replace('.yaml', '.png')
+        map_resolution = self.current_mapdata.resolution
         map_img = cv2.imread(os.path.join(
             BASE_PATH, map_path), cv2.IMREAD_GRAYSCALE)
 
         height, width = map_img.shape
-        origin_x = self.mapdata.origin[0][0]
+        origin_x = self.current_mapdata.origin[0][0]
         rect_x_min = origin_x  # The minimum x coordinate of the rectangle
         rect_x_max = width * map_resolution + origin_x  # The maximum x coordinate of the rectangle
         rect_y_min = - height * map_resolution / 2  # The minimum y coordinate of the rectangle
