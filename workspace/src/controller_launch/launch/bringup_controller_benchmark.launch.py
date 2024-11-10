@@ -4,21 +4,23 @@ import os
 # ROS modules
 from launch import LaunchDescription
 from launch.actions import (
-    IncludeLaunchDescription, DeclareLaunchArgument)  # ExecuteProcess
+    IncludeLaunchDescription, DeclareLaunchArgument, OpaqueFunction)  # ExecuteProcess
 from launch.substitutions import LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
 from ament_index_python.packages import get_package_share_directory
+from launch.launch_context import LaunchContext
 
 
-def generate_launch_description():
+def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
     this_package_dir = get_package_share_directory('controller_launch')
     old_launch_dir = get_package_share_directory('controller_benchmark')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
     gazebo_dir = get_package_share_directory('gazebo_ros')
 
     gui = LaunchConfiguration('gui')
+    robot_type = LaunchConfiguration('rt')
 
     rviz_config_file = os.path.join(this_package_dir, 'nav2_default_view.rviz')
     global_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
@@ -33,13 +35,19 @@ def generate_launch_description():
     #     'map_server', 'planner_server', 'controller_server']
     world = os.path.join(this_package_dir, 'empty_world.world')
 
-    urdf = os.path.join(this_package_dir, 'turtlebot3_waffle.urdf')
+    match robot_type.perform(context=context):
+        case 'burger':
+            urdf = os.path.join(this_package_dir, 'turtlebot3_burger.urdf')
+            robot_name = 'turtlebot3_burger'
+            robot_sdf = os.path.join(this_package_dir, 'burger_model.sdf')
+        case _:
+            urdf = os.path.join(this_package_dir, 'turtlebot3_waffle.urdf')
+            robot_name = 'turtlebot3_waffle'
+            robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
 
     with open(urdf, 'r') as urdf_file:
         robot_description = urdf_file.read()
 
-    robot_name = 'turtlebot3_waffle'
-    robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
     pose = {'x': '0.0', 'y': '0.0', 'z': '0.0',
             'R': '0.0', 'P': '0.0', 'Y': '0.0'}
 
@@ -58,11 +66,8 @@ def generate_launch_description():
     # gazebo_ros/spawn_entity.py                -> spawn robot          - robot_sdf, pose
     # -------------------------------------------------------------------------------------
 
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'gui', default_value='True',
-            description='Whether to run gazebo headless.'
-        ),
+    return [
+
 
         Node(
             package='tf2_ros',
@@ -163,4 +168,22 @@ def generate_launch_description():
             parameters=[{'use_sim_time': True},
                         {'autostart': True},
                         {'node_names': lifecycle_nodes}]),
-    ])
+    ]
+
+
+def generate_launch_description() -> LaunchDescription:
+    declared_arguments = [
+        DeclareLaunchArgument(
+            'gui', default_value='True',
+            description='Whether to run gazebo headless.'
+        ),
+
+        DeclareLaunchArgument(
+            'rt', default_value='waffle',
+            description='Robot type: waffle, burger, or enjoy.'
+        ),
+    ]
+
+    return LaunchDescription(
+        declared_arguments + [OpaqueFunction(function=launch_setup)]
+    )
