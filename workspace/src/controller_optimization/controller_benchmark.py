@@ -34,7 +34,7 @@ import utils.util_nodes as util_nodes
 import constants
 from utils.controller_results import ControllerResult
 from utils.controller_metrics import ControllerMetric
-from utils.controller_parameters import MPPIControllerParameters
+from utils.controller_parameters import ControllerParameters
 from utils.parameter_manager import ParameterManager
 
 BASE_PATH = constants.BASE_PATH
@@ -55,27 +55,26 @@ class MapData:
 
 
 class ControllerBenchmark:
-    RESULTS_PATH = os.path.join(REPO_PATH, 'results')
-    METRICS_PATH = os.path.join(REPO_PATH, 'metrics')
-    COSTMAP_RESOLUTION = 0.05  # TODO: get from costmap
-
     def __init__(
-            self, logger, config_path: str,
-            default_controller_params: MPPIControllerParameters) -> None:
+            self, logger,
+            config_path: str,
+            result_save_path: str = constants.RESULTS_PATH,
+            metric_save_path: str = constants.METRICS_PATH) -> None:
+        self.logger = logger
         self.nodes_active = False
 
-        # create directories
-        if os.path.isdir(ControllerBenchmark.RESULTS_PATH) is False:
-            os.makedirs(ControllerBenchmark.RESULTS_PATH)
-        if os.path.isdir(ControllerBenchmark.METRICS_PATH) is False:
-            os.makedirs(ControllerBenchmark.METRICS_PATH)
+        if os.path.isdir(result_save_path) is False:
+            os.makedirs(result_save_path)
+        self.result_save_path = result_save_path
 
-        self.logger = logger
+        if os.path.isdir(metric_save_path) is False:
+            os.makedirs(metric_save_path)
+        self.metric_save_path = metric_save_path
+
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
 
         self.config_path = config_path
-        self.default_controller_params = default_controller_params
         self.params: Dict = {}
         self.mapdata: MapData = None
         self.load_config()
@@ -229,27 +228,41 @@ class ControllerBenchmark:
         self.nav.info('Change local map request was successful!')
         return True
 
-    def update_map(self, mapdata: MapData) -> Tuple[bool, str]:
+    def update_map(self, mapdata: MapData = None) -> bool:
+        mapdata = mapdata if mapdata is not None else self.mapdata
+
         self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
         res = self.changeGlobalMap(mapdata.yaml_path)
         if res is False:
-            msg = 'Failed to change global map'
-            result = False
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result, msg
+            self.logger.error('Failed to change global map')
+            return False
 
         local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
         self.logger.info(f'Changing local map to: {local_map_path}')
         res = self.changeLocalMap(local_map_path)
         if res is False:
-            msg = 'Failed to change local map'
-            result = False
-            self.logger.error('Failed to run benchmark: %s', msg)
-            return result, msg
+            self.logger.error('Failed to change local map')
+            return False
 
         self.nav.clearAllCostmaps()
         time.sleep(0.5)
-        return True, 'Maps updated'
+        return True
+
+    def update_parameters(self, parameters: ControllerParameters) -> bool:
+        self.logger.info(f'Setting parameters: {parameters}')
+        controller_name = parameters.controller_name
+        critics_dict = {}
+        for critic in parameters.critics:
+            critics_dict.update({
+                f'{controller_name}.{critic.name}.cost_weight': critic.cost_weight,
+                f'{controller_name}.{critic.name}.cost_power': critic.cost_power
+            })
+
+        params_set = self.param_manager.set_parameters(parameters.to_dict())
+        if params_set is False:
+            self.logger.error('Failed to set parameters')
+            return False
+        return True
 
     @timing_decorator(
         lambda self: self.logger.info('Launching nodes...'),
@@ -361,18 +374,12 @@ class ControllerBenchmark:
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
     def run_benchmark(
-            self, run_uid: str = '', parameters: MPPIControllerParameters = None, mapdata: MapData = None,
-            timeout: float = None, store_result: bool = False) -> ControllerResult:
+            self, run_uid: str = '', timeout: float = None, store_result: bool = False) -> ControllerResult:
         # _____________________ BENCHMARK SETUP _____________________
-        update_map = False if mapdata is None else True
-        mapdata = self.mapdata if mapdata is None else mapdata
-
-        update_params = False if parameters is None else True
-        parameters = self.default_controller_params if parameters is None else parameters
-
+        mapdata = self.mapdata
         result = ControllerResult(
             controller_name=self.params['controller'],
-            map_name=mapdata.name,
+            map_name=self.mapdata.name,
             uid=run_uid)
 
         # check if nodes are active
@@ -382,28 +389,6 @@ class ControllerBenchmark:
             result.status_msg = msg
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
-
-        # set parameters to controller server
-        if update_params is True:
-            self.logger.info(f'Setting parameters: {parameters}')
-            params_set = self.param_manager.set_parameters(parameters.to_dict())
-            if params_set is False:
-                msg = 'Failed to set parameters'
-                result.success = False
-                result.status_msg = msg
-                self.logger.error('Failed to run benchmark: %s', msg)
-                return result
-
-        # change global and local map
-        if update_map is True:
-            success, msg = self.update_map(mapdata)
-            if success is False:
-                result.success = False
-                result.status_msg = msg
-                self.logger.error('Failed to run benchmark: %s', msg)
-                return result
-            self.nav.clearAllCostmaps()
-            time.sleep(0.5)
 
         # getting start and goal pose
         self.logger.info('Generating robot start and goal pose.')
@@ -608,10 +593,10 @@ class ControllerBenchmark:
 
     def save_result(
             self, result: ControllerResult,
-            output_dir: str = '', uid: str = '') -> None:
+            output_dir: str = '', uid: str = '') -> str:
         self.logger.info(f'Saving result: {result.map_name}.')
         output_dir = output_dir if output_dir != '' else \
-            ControllerBenchmark.RESULTS_PATH
+            self.result_save_path
 
         if os.path.isdir(output_dir) is False:
             os.makedirs(output_dir)
@@ -628,6 +613,7 @@ class ControllerBenchmark:
             f.write(save_path)
 
         self.logger.info(f'Written results to: {save_path}')
+        return save_path
 
     def load_result(self, path: str) -> ControllerResult:
         self.logger.info(f'Loading result: {path}.')
@@ -644,7 +630,7 @@ class ControllerBenchmark:
 
     def load_last_result(self) -> ControllerResult:
         latest_result_txt = os.path.join(
-            ControllerBenchmark.RESULTS_PATH, 'last_result.txt')
+            self.result_save_path, 'last_result.txt')
 
         if os.path.isfile(latest_result_txt) is False:
             raise FileNotFoundError(f'File not found: {latest_result_txt}')
@@ -659,10 +645,9 @@ class ControllerBenchmark:
 
     def save_metric(
             self, metric: ControllerMetric,
-            output_dir: str = '', uid: str = '') -> None:
+            output_dir: str = '', uid: str = '') -> str:
         self.logger.info(f'Saving result: {metric.map_name}.')
-        output_dir = output_dir if output_dir != '' else \
-            ControllerBenchmark.METRICS_PATH
+        output_dir = output_dir if output_dir != '' else self.metric_save_path
 
         if os.path.isdir(output_dir) is False:
             os.makedirs(output_dir)
@@ -679,6 +664,7 @@ class ControllerBenchmark:
             f.write(save_path)
 
         self.logger.info(f'Written results to: {save_path}')
+        return save_path
 
     def load_metric(self, path: str) -> ControllerMetric:
         self.logger.info(f'Loading metric: {path}.')
@@ -694,13 +680,12 @@ class ControllerBenchmark:
         return metric
 
     def load_last_metric(self) -> ControllerMetric:
-        latest_metric_txt = os.path.join(
-            ControllerBenchmark.METRICS_PATH, 'last_metric.txt')
+        latest_metric_txt = os.path.join(self.metric_save_path, 'last_metric.txt')
 
         if os.path.isfile(latest_metric_txt) is False:
             raise FileNotFoundError(f'File not found: {latest_metric_txt}')
 
-        with open(os.path.join(ControllerBenchmark.METRICS_PATH, 'last_metric.txt'), 'r') as f:
+        with open(latest_metric_txt, 'r') as f:
             last_metric_path = f.read().strip()
 
         if os.path.isfile(last_metric_path) is False:

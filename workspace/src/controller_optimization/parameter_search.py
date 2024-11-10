@@ -4,38 +4,6 @@ import os
 import constants
 from controller_benchmark import ControllerBenchmark
 
-from utils.controller_parameters import MPPIControllerParameters
-from utils.controller_parameters_dict
-
-OUTPUT_PATH = constants.OPTIMIZATION_RESULTS_PATH
-
-
-# for ensuring numpy types can go to yaml
-class SearchOuputDict(TypedDict):
-    num_of_runs: int
-    successful_runs: int
-    failed_runs: int
-    loop_time: float  # [s]
-
-    timeout: float  # [s]
-
-    best_score: float
-    best_parameters: dict
-    best_metrics_path: str
-
-    reference_score: float
-    reference_parameters: dict
-    reference_metrics_path: str
-
-
-class OutputRowDict(TypedDict):
-    id: str
-    success: bool
-    score: float
-    time_elapsed: float
-    scored_metrics: dict
-    msg: dict
-
 
 class ParameterSearch:
     def __init__(
