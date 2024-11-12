@@ -5,3 +5,6 @@ tabulate
 numba
 psutil
 memory_profiler
+
+coloredlogs
+

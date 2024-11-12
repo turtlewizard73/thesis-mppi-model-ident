@@ -9,7 +9,7 @@ from pprint import pformat
 from threading import Thread
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 import cv2
@@ -572,10 +572,13 @@ class ControllerBenchmark:
 
             time_elapsed=result.time_elapsed,
             success=result.success,
+            status_msg=result.status_msg,
+            path_xy=result.path_xy,
+            odom_xy=result.odom_xy,
+            cmd_vel_t=result.cmd_vel_t,
+
             distance_to_goal=distance_to_goal,
             angle_to_goal=angle_to_goal / np.pi * 180,  # rad to deg
-
-            path_xy=result.path_xy,
 
             linear_velocity=result.cmd_vel_xy[:, 0],
             avg_linear_velocity=np.mean(result.cmd_vel_xy[:, 0]),
@@ -706,6 +709,17 @@ class ControllerBenchmark:
 
         return self.load_metric(last_metric_path)
 
+    def save_to_yaml(self, instance, filepath):
+        def numpy_converter(obj):
+            # Convert numpy arrays to lists for YAML serialization
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return obj
+
+        # Convert dataclass to a dictionary and serialize
+        with open(filepath, 'w', encoding='utf-8') as file:
+            yaml.dump(asdict(instance), file, default_flow_style=False, sort_keys=False, default=numpy_converter)
+
     def plot_result(self, result: ControllerResult) -> Figure:
         self.logger.info('Generating result plot.')
 
@@ -738,7 +752,8 @@ class ControllerBenchmark:
             map_img, cmap='gray', aspect='auto',
             interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
 
-        ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label='Plan', color='g')
+        if result.path_xy.shape[0] > 0:
+            ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label='Plan', color='g')
         ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label='Route', color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
@@ -766,8 +781,7 @@ class ControllerBenchmark:
 
         return fig
 
-    def plot_metric(
-            self, result: ControllerResult, metric: ControllerMetric) -> Figure:
+    def plot_metric(self, metric: ControllerMetric) -> Figure:
         self.logger.info('Generating metric plot.')
 
         # plot1: same as result plot
@@ -797,16 +811,17 @@ class ControllerBenchmark:
             interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
 
         plan_label = f'Plan - dist: {metric.distance_to_goal:.2f} [m]'
-        ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label=plan_label, color='g')
+        if metric.path_xy.shape[0] > 0:
+            ax_plan.plot(metric.path_xy[:, 0], metric.path_xy[:, 1], label=plan_label, color='g')
         time_s = metric.time_elapsed
         route_label = f'Route - time: {time_s:.2f} [s]'
-        ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label=route_label, color='r')
+        ax_plan.plot(metric.odom_xy[:, 0], metric.odom_xy[:, 1], label=route_label, color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
 
         # jerk graph
         # ax_jerk.set_title('Jerk')
-        cmd_vel_t_s = result.cmd_vel_t
+        cmd_vel_t_s = metric.cmd_vel_t
         ax_jerk.set_xlabel('Time [s]')
         ax_jerk.set_ylabel('Jerk [m/s^3], [rad/s^3]')
         label = f'Linear jerk - RMS: {metric.rms_linear_jerk:.2f} [m/s^3]'
@@ -815,8 +830,5 @@ class ControllerBenchmark:
         ax_jerk.plot(cmd_vel_t_s, metric.angular_jerks, label=label, color='r')
         ax_jerk.grid(visible=True, which='both', axis='both')
         ax_jerk.legend()
-
-        # TODO: make nicer data vis
-        self.logger.info(metric.to_table_string())
 
         return fig
