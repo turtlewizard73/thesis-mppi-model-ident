@@ -295,7 +295,7 @@ class ControllerBenchmark:
             self.nodes_active = True
 
         except Exception as e:
-            raise RuntimeError(f'Failed to launch nodes: {e}')
+            raise RuntimeError(f'Failed to launch nodes: {e}') from e
 
     def _spin_executor(self, executor):
         try:
@@ -330,7 +330,7 @@ class ControllerBenchmark:
             self.nodes_active = False
 
         except Exception as e:
-            raise RuntimeError(f'Failed to stop nodes: {e}')
+            raise RuntimeError(f'Failed to stop nodes: {e}') from e
 
     @timing_decorator(
         lambda self: self.logger.info('Checking if nodes are active...'),
@@ -490,6 +490,24 @@ class ControllerBenchmark:
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
 
+        # add everything calculated outside to result
+        result.time_elapsed = time_elapsed
+        result.success = True
+        result.status_msg = 'Success'
+        result.path_xy = path_xy
+        result.path_omega = path_omega
+        self.get_result(result, start_time, end_time)
+
+        if store_result is True:
+            self.results.append(result)
+
+        return result
+
+    def get_result(
+            self,
+            result: ControllerResult,
+            start_time: rclpy.clock.Time,
+            end_time: rclpy.clock.Time) -> None:
         odom_xy, odom_omega, odom_t = self.odom_sub.get_data_between(
             start_time.nanoseconds, end_time.nanoseconds)
         cmd_vel_xy, cmd_vel_omega, cmd_vel_t = self.cmd_vel_sub.get_data_between(
@@ -501,24 +519,25 @@ class ControllerBenchmark:
         costmap_msg: Costmap = self.nav.getLocalCostmap()
         size_x = costmap_msg.metadata.size_x
         size_y = costmap_msg.metadata.size_y
-        costmap_array = np.array(costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
+        costmap_array = np.array(
+            costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
         costmap_array = np.flip(costmap_array, 0)
 
         map_resolution = costmap_msg.metadata.resolution
         origin_x = costmap_msg.metadata.origin.position.x
         origin_y = costmap_msg.metadata.origin.position.y
         path_costs = []
-        for x, y in path_xy:
+        for x, y in result.path_xy:
             x_idx = int((x - origin_x) / map_resolution)
             y_idx = int((y - origin_y) / map_resolution)
             path_costs.append(costmap_msg.data[y_idx * size_x + x_idx])
 
         result.start_time = start_time.nanoseconds * 1e-9
-        result.time_elapsed = time_elapsed
-        result.success = True
-        result.status_msg = 'Success'
-        result.path_xy = path_xy
-        result.path_omega = path_omega
+        # result.time_elapsed = time_elapsed
+        # result.success = True
+        # result.status_msg = 'Success'
+        # result.path_xy = path_xy
+        # result.path_omega = path_omega
         result.odom_xy = odom_xy
         result.odom_omega = odom_omega
         result.odom_t = odom_t
@@ -529,24 +548,6 @@ class ControllerBenchmark:
         result.critic_scores_t = critic_scores_t
         result.costmap = costmap_array
         result.path_costs = np.array(path_costs)
-
-        if store_result is True:
-            self.results.append(result)
-
-        return result
-
-    @timing_decorator(
-        lambda self: self.logger.info('Running batch...'),
-        lambda self, ex_time: self.logger.info(f'Batch finished in {ex_time:.4f} seconds.'))
-    def run_batch(self, parameters: list[dict]) -> list[dict[int, bool]]:
-        # make a list to store if the benchmark was successful
-        results: list[dict[int, bool]] = []
-
-        for i, params in enumerate(parameters):
-            success = self.run_benchmark(parameters=params, store_results=True)
-            results.append({i: success})
-
-        return results
 
     @timing_decorator(
         lambda self: self.logger.info('Calculating metric...'),
@@ -618,7 +619,8 @@ class ControllerBenchmark:
             pickle.dump(result, f, pickle.HIGHEST_PROTOCOL)
 
         # save in the output_dir the path to the result
-        with open(os.path.join(output_dir, 'last_result.txt'), 'w') as f:
+        with open(os.path.join(output_dir, 'last_result.txt'), 'w',
+                  encoding='utf-8') as f:
             f.write(save_path)
 
         self.logger.info(f'Written results to: {save_path}')
@@ -644,7 +646,7 @@ class ControllerBenchmark:
         if os.path.isfile(latest_result_txt) is False:
             raise FileNotFoundError(f'File not found: {latest_result_txt}')
 
-        with open(os.path.join(ControllerBenchmark.RESULTS_PATH, 'last_result.txt'), 'r') as f:
+        with open(latest_result_txt, 'r', encoding='utf-8') as f:
             last_result_path = f.read().strip()
 
         if os.path.isfile(last_result_path) is False:
@@ -669,7 +671,8 @@ class ControllerBenchmark:
             pickle.dump(metric, f, pickle.HIGHEST_PROTOCOL)
 
         # save in the output_dir the path to the result
-        with open(os.path.join(output_dir, 'last_metric.txt'), 'w') as f:
+        with open(os.path.join(output_dir, 'last_metric.txt'), 'w',
+                  encoding='utf-8') as f:
             f.write(save_path)
 
         self.logger.info(f'Written results to: {save_path}')
@@ -694,11 +697,12 @@ class ControllerBenchmark:
         if os.path.isfile(latest_metric_txt) is False:
             raise FileNotFoundError(f'File not found: {latest_metric_txt}')
 
-        with open(latest_metric_txt, 'r') as f:
+        with open(latest_metric_txt, 'r', encoding='utf-8') as f:
             last_metric_path = f.read().strip()
 
         if os.path.isfile(last_metric_path) is False:
-            raise FileNotFoundError(f'Invalid path to metric file: {last_metric_path}')
+            raise FileNotFoundError(
+                f'Invalid path to metric file: {last_metric_path}')
 
         return self.load_metric(last_metric_path)
 
