@@ -24,7 +24,7 @@ def generate_launch_description():
     autostart = 'true'
     use_respawn = 'False'
 
-    rviz_config_file = os.path.join(this_package_dir, 'nav2_default_view.rviz')
+    rviz_config_file = os.path.join(this_package_dir, 'rviz_default_view.rviz')
     world = os.path.join(this_package_dir, 'world_only.world')
     urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
     with open(urdf, 'r', encoding='utf-8') as file:

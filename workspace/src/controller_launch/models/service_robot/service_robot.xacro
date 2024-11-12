@@ -90,8 +90,8 @@
                 x="${axle_lenght}" y="${axle_width}" z="${axle_spring_z}"/>
         </link>
         <joint name="${prefix}_axle_center_joint" type="revolute">
-            <origin xyz="${-axle_center} ${rear_wheel_separation*reflect} ${base_offset_z + axle_height}" rpy="0 0 0"/>
             <parent link="base_link"/>
+            <origin xyz="${-axle_center} ${rear_wheel_separation*reflect} ${base_offset_z + axle_height}" rpy="0 0 0"/>
             <child  link="${prefix}_axle_center_link"/>
             <axis xyz="0 1 0" />
             <limit upper="${axle_max_rotation}" lower="${-axle_max_rotation}" velocity="2" effort="1"/>
@@ -294,11 +294,11 @@
         <origin xyz="${lidar_base_front_x} ${lidar_base_front_y} ${lidar_base_front_z}" rpy="0 0 0"/>
     </joint>
 
-    <xacro:lidar
+    <!-- <xacro:lidar
         prefix="lidar_base_rear"
         r="${ydlidar_g2_radius}" h="${ydlidar_g2_height}"
         x="${lidar_base_rear_x}" y="${lidar_base_rear_y}" z="${lidar_base_rear_z}"
-        roll="0.0" pitch="0.0" yaw="${lidar_base_rear_yaw}"/>
+        roll="0.0" pitch="0.0" yaw="${lidar_base_rear_yaw}"/> -->
 
     <!-- Base Depth Camera link -->
     <!-- <xacro:kinematic_link name="depth_camera_base">
@@ -378,9 +378,9 @@
 
 
     <!-- Docking camera -->
-    <xacro:kinematic_link name="camera">
+    <!-- <xacro:kinematic_link name="camera">
         <origin xyz="${cam_pos_x} 0 ${cam_pos_z}" rpy="0 0 ${-pi}" />
-    </xacro:kinematic_link>
+    </xacro:kinematic_link> -->
 
     <!-- Bumper -->
     <!-- <link name="bumper_link">

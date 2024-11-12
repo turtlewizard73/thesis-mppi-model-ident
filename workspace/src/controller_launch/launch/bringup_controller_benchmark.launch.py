@@ -24,7 +24,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
     gui = LaunchConfiguration('gui')
     robot_type = LaunchConfiguration('rt')
 
-    rviz_config_file = os.path.join(this_package_dir, 'nav2_default_view.rviz')
+    rviz_config_file = os.path.join(this_package_dir, 'rviz_default_view.rviz')
     global_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
     local_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
 
@@ -144,6 +144,17 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
                 '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']],
             output='screen',
             condition=IfCondition(str(robot_type.perform(context) == 'enjoy'))),
+
+        Node(
+            package='joint_state_publisher',
+            executable='joint_state_publisher',
+            output='log',
+            parameters=[
+                {'use_sim_time': True,
+                 'rate': 10,
+                 'source_list': ['/wheel_joint_states']}],
+            # condition=IfCondition(str(robot_type.perform(context) == 'enjoy'))
+        ),
 
         Node(
             package='nav2_map_server',

@@ -91,3 +91,9 @@ output2: sum of costs on the path
 - done the costmap to avg cost part
   - fickung flipping
   - grid search?
+
+## 2024. 11. 12.
+- random search működik
+- több robot lespawnolása működik külön ugye
+  - service robot át lett alakítvav (szenzorok kiszedve inercia a lényeg)
+  - plus joint state pub megoldodda hogy kerekek nem voltak tf részei

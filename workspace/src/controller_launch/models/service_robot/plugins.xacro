@@ -14,7 +14,7 @@
             <sensor name="${prefix}_sensor" type="ray">
                 <pose>0 0 0 0 0 0</pose>
                 <always_on>true</always_on>
-                <visualize>false</visualize>
+                <visualize>true</visualize>
                 <update_rate>5</update_rate>
                 <ray>
                     <scan>
@@ -23,8 +23,8 @@
                             <!-- based on how the real lidar works, the number of samples refers to the
                                  whole rotation, part of which is then cut off -->
                             <resolution>1</resolution>
-                            <min_angle>${min_angle}</min_angle>
-                            <max_angle>${max_angle}</max_angle>
+                            <min_angle>1.571</min_angle>
+                            <max_angle>4.712</max_angle>
                         </horizontal>
                     </scan>
                     <range>
@@ -52,15 +52,15 @@
 
     <xacro:lidar_plugin
         prefix="lidar_base_front"
-        topic="/lidar/base/front/scan"
-        min_angle="${-1.0*pi}"
-        max_angle="${1.0*pi}"/>
+        topic="scan"
+        min_angle="-1.396263"
+        max_angle="1.396263"/>
         <!-- [-180°;180°] -->
-    <xacro:lidar_plugin
+    <!-- <xacro:lidar_plugin
         prefix="lidar_base_rear"
         topic="/lidar/base/rear/scan"
         min_angle="${-115.0/180*pi}"
-        max_angle="${115.0/180*pi}"/>
+        max_angle="${115.0/180*pi}"/> -->
         <!-- [-115°;115°] -->
 
     <!-- <joint name="base_joint" type="fixed">
@@ -90,6 +90,7 @@
             <wheel_torque>10</wheel_torque>
         </plugin>
     </gazebo>
+
     <xacro:macro name="driven_wheel_friction" params="prefix">
         <gazebo reference="${prefix}_wheel">
             <material>Gazebo/FlatBlack</material>
@@ -187,11 +188,11 @@
             </sensor>
         </gazebo>
     </xacro:macro>
-    <xacro:marker_camera link="camera_link" topic="camera" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/>
-    <xacro:marker_camera link="camera_top_front_link" topic="camera/top/front" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/>
+    <!-- <xacro:marker_camera link="camera_link" topic="camera" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/> -->
+    <!-- <xacro:marker_camera link="camera_top_front_link" topic="camera/top/front" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/> -->
     <!-- <xacro:marker_camera link="camera_top_left_link" topic="camera/top/left" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/> -->
     <!-- <xacro:marker_camera link="camera_top_right_link" topic="camera/top/right" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/> -->
-    <xacro:marker_camera link="camera_top_back_link" topic="camera/top/back" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/>
+    <!-- <xacro:marker_camera link="camera_top_back_link" topic="camera/top/back" fov_horizontal="1.3962634" fov_vertical="1.0471975" width="1200" height="900" rate="5.0"/> -->
 
     <!-- Depth cameras -->
     <xacro:macro name="gemini2" params="name depth_ns color_ns width height rate">
@@ -240,11 +241,11 @@
             </sensor>
         </gazebo>
     </xacro:macro>
-    <xacro:gemini2 name="depth_camera_base" depth_ns="/depth/base" color_ns="/camera/base/front" width="640" height="400" rate="10.0"/>
-    <xacro:gemini2 name="depth_camera_top" depth_ns="/depth/top" color_ns="/camera/top/front" width="640" height="400" rate="10.0"/>
+    <!-- <xacro:gemini2 name="depth_camera_base" depth_ns="/depth/base" color_ns="/camera/base/front" width="640" height="400" rate="10.0"/> -->
+    <!-- <xacro:gemini2 name="depth_camera_top" depth_ns="/depth/top" color_ns="/camera/top/front" width="640" height="400" rate="10.0"/> -->
 
-    <!-- Monitor camera -->
-    <xacro:kinematic_link name="monitor_camera" visual="false">
+    <!-- Monitor camera --> <!-- 4:3 aspect ratio -->
+    <!-- <xacro:kinematic_link name="monitor_camera" visual="false">
         <origin xyz="-1 0 0.7" rpy="0 0.3 0"/>
     </xacro:kinematic_link>
     <gazebo reference="monitor_camera_link">
@@ -254,7 +255,7 @@
                 <horizontal_fov>1.3962634</horizontal_fov>
                 <image>
                     <width>300</width>
-                    <height>225</height> <!-- 4:3 aspect ratio -->
+                    <height>225</height>
                     <format>R8G8B8</format>
                 </image>
                 <clip>
@@ -269,7 +270,7 @@
                 <frameName>monitor_camera_link</frameName>
             </plugin>
         </sensor>
-    </gazebo>
+    </gazebo> -->
 
     <!-- Odometry -->
     <gazebo>
@@ -433,7 +434,7 @@
     </gazebo>
     </xacro:if> -->
 
-    <gazebo reference="base_link">
+    <!-- <gazebo reference="base_link">
         <material>Gazebo/FlatBlack</material>
         <sensor name="collision_sensor" type="contact">
             <plugin name="gazebo_ros_bumper_controller" filename="libgazebo_ros_bumper.so">
@@ -447,7 +448,7 @@
                 <collision>base_link_fixed_joint_lump__bumper_link_collision_2</collision>
             </contact>
         </sensor>
-    </gazebo>
+    </gazebo> -->
 
     <!-- LED Strips-->
     <xacro:macro name="led_plugin" params="link topic_name">
@@ -460,8 +461,8 @@
         </gazebo>
     </xacro:macro>
 
-    <xacro:led_plugin link="led0_link" topic_name="gazebo/led0/set_color"/>
+    <!-- <xacro:led_plugin link="led0_link" topic_name="gazebo/led0/set_color"/>
     <xacro:led_plugin link="led1_link" topic_name="gazebo/led1/set_color"/>
     <xacro:led_plugin link="led2_link" topic_name="gazebo/led2/set_color"/>
-    <xacro:led_plugin link="led3_link" topic_name="gazebo/led3/set_color"/>
+    <xacro:led_plugin link="led3_link" topic_name="gazebo/led3/set_color"/> -->
 </robot>
