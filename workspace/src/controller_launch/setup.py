@@ -1,4 +1,5 @@
 from setuptools import find_packages, setup
+import os
 from glob import glob
 
 package_name = 'controller_launch'
@@ -15,7 +16,10 @@ setup(
         ('share/' + package_name, glob('config/*')),
         ('share/' + package_name, glob('worlds/*')),
         ('share/' + package_name, glob('maps/*')),
-        ('share/' + package_name, glob('models/*')),
+        ('share/' + package_name,
+         [f for f in glob('models/*') if os.path.isfile(f)]),
+        ('share/' + package_name,
+         [f for f in glob('models/service_robot/*') if os.path.isfile(f)]),
     ],
     install_requires=['setuptools'],
     zip_safe=True,

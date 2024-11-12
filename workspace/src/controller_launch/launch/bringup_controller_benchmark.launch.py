@@ -12,6 +12,8 @@ from launch.conditions import IfCondition
 from ament_index_python.packages import get_package_share_directory
 from launch.launch_context import LaunchContext
 
+import xacro
+
 
 def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
     this_package_dir = get_package_share_directory('controller_launch')
@@ -36,17 +38,24 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
     world = os.path.join(this_package_dir, 'empty_world.world')
 
     match robot_type.perform(context=context):
+        case 'enjoy':
+            urdf = os.path.join(this_package_dir, 'service_robot.urdf')
+            robot_name = 'service_robot'
+            robot_sdf = os.path.join(this_package_dir, 'burger_model.sdf')  # TODO: change
+            robot_description = xacro.process_file(
+                os.path.join(this_package_dir, 'service_robot.xacro')).toprettyxml()
         case 'burger':
             urdf = os.path.join(this_package_dir, 'turtlebot3_burger.urdf')
             robot_name = 'turtlebot3_burger'
             robot_sdf = os.path.join(this_package_dir, 'burger_model.sdf')
+            with open(urdf, 'r') as urdf_file:
+                robot_description = urdf_file.read()
         case _:
             urdf = os.path.join(this_package_dir, 'turtlebot3_waffle.urdf')
             robot_name = 'turtlebot3_waffle'
             robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
-
-    with open(urdf, 'r') as urdf_file:
-        robot_description = urdf_file.read()
+            with open(urdf, 'r') as urdf_file:
+                robot_description = urdf_file.read()
 
     pose = {'x': '0.0', 'y': '0.0', 'z': '0.0',
             'R': '0.0', 'P': '0.0', 'Y': '0.0'}
@@ -106,8 +115,9 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
             output='screen',
             parameters=[{'use_sim_time': True,
                         'robot_description': robot_description}],
-            remappings=[('/tf', 'tf'),
-                        ('/tf_static', 'tf_static')]),
+            # remappings=[('/tf', 'tf'),
+            #             ('/tf_static', 'tf_static')]
+        ),
 
         Node(
             package='gazebo_ros',
@@ -120,7 +130,20 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
                 '-timeout', '60',
                 '-robot_namespace', '',
                 '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
-                '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']]),
+                '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']],
+            condition=IfCondition(str(robot_type.perform(context) != 'enjoy'))),
+
+        Node(
+            package='gazebo_ros',
+            executable='spawn_entity.py',
+            arguments=[
+                '-entity', 'service_robot',
+                '-timeout', '60',
+                '-topic', 'robot_description',
+                '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
+                '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']],
+            output='screen',
+            condition=IfCondition(str(robot_type.perform(context) == 'enjoy'))),
 
         Node(
             package='nav2_map_server',

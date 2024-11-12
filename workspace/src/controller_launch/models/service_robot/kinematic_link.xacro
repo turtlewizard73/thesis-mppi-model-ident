@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="enjoy">
+    <xacro:macro name="kinematic_link" params="name base_frame:=base_link visual:=true *origin">
+        <link name="${name}_link">
+            <xacro:if value="${visual}">
+                <visual>
+                    <material name="red"/>
+                    <geometry>
+                        <box size="0.03 0.02 0.02"/>
+                    </geometry>
+                </visual>
+            </xacro:if>
+            <inertial>
+                <mass value="0.001"/>
+                <inertia ixx="0.0000002" ixy="0" ixz="0" iyy="0.0000002" iyz="0" izz="0.0000002"/>
+            </inertial>
+        </link>
+        <joint name="${name}_joint" type="fixed">
+            <xacro:insert_block name="origin"/>
+            <parent link="${base_frame}"/>
+            <child  link="${name}_link"/>
+        </joint>
+        <gazebo reference="${name}_link">
+            <material>Gazebo/Red</material>
+            <selfCollide>0</selfCollide>
+        </gazebo>
+        <gazebo reference="${name}_joint">
+            <disableFixedJointLumping>true</disableFixedJointLumping>
+        </gazebo>
+    </xacro:macro>
+</robot>
