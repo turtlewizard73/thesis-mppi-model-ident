@@ -3,6 +3,8 @@
 # Common modules
 import os
 import argparse
+# import coloredlogs
+# coloredlogs.install()
 import logging
 from time import strftime
 import time
@@ -12,13 +14,16 @@ import numpy as np
 from functools import wraps
 from scipy.spatial.transform import Rotation
 
+import constants
+
 # ROS msg types
 from geometry_msgs.msg import Quaternion
 
+REPO_PATH = constants.REPO_PATH
 
 def setup_run(
         logger_name: str = 'ControllerBenchmark',
-        log_file_path: str = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/logs') -> logging.Logger:
+        log_file_path: str = os.path.join(REPO_PATH, 'logs')) -> logging.Logger:
     parser = argparse.ArgumentParser(description='Run controller benchmark.')
     parser.add_argument(
         '-d', '--debug', action='store_true', default=False,

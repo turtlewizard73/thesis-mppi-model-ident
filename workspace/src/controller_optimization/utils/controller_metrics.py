@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 import numpy as np
-import pandas as pd
 
 
 @dataclass
@@ -12,13 +11,16 @@ class ControllerMetric:
     map_name: str
     uid: str = ''  # unique identifier, could be a timestamp, id or params
 
+    # common properties from result needed for plotting
     time_elapsed: float = 0.0  # [s]
     success: bool = False  # if the controller reached the goal approximately
+    status_msg: str = ''  # reason of fail or extra info
+    path_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+    odom_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+    cmd_vel_t: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+
     distance_to_goal: float = 0.0  # [m] stopping distance from the goal
     angle_to_goal: float = 0.0  # [rad] stopping angle difference from the goal
-
-    # generated plan on global map
-    path_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
 
     # linear velocity metrics
     linear_velocity: np.ndarray = field(
@@ -53,19 +55,3 @@ class ControllerMetric:
     sum_of_costs: float = 0.0  # sum of all costs
     avg_cost: float = 0.0  # average cost
     rms_cost: float = 0.0  # root mean squared cost
-
-    def to_table_string(self) -> str:
-        # Create a header and rows with values aligned
-        table = (
-            f"{'Attribute':<30} | {'Value'}\n"
-            f"{'-' * 44}\n"
-            f"{'Maximum Linear Velocity':<30} | {self.max_linear_velocity} m/s\n"
-            f"{'Average Linear Velocity':<30} | {self.avg_linear_velocity} m/s\n"
-            f"{'Maximum Linear Acceleration':<30} | {self.max_linear_acceleration} m/s²\n"
-            f"{'Average Linear Acceleration':<30} | {self.avg_linear_acceleration} m/s²\n"
-            f"{'Maximum Angular Acceleration':<30} | {self.max_angular_acceleration} rad/s²\n"
-            f"{'Average Angular Acceleration':<30} | {self.avg_angular_acceleration} rad/s²\n"
-            f"{'Root root mean squared Linear Jerk':<30} | {self.rms_linear_jerk} m/s³\n"
-            f"{'Root root mean squared Angular Jerk':<30} | {self.rms_angular_jerk} rad/s³\n"
-        )
-        return table
