@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="enjoy">
+    <xacro:property name="base_height"               value="0.22"/>
+    <xacro:property name="base_length"               value="0.52"/>
+    <xacro:property name="base_width"                value="0.36"/>
+    <xacro:property name="base_weight"               value="30.0"/>
+    <xacro:property name="tray_diff_z"               value="0.24"/>
+
+    <xacro:property name="bottom_gap"                value="0.025"/>
+    <xacro:property name="body_gap"                  value="0.022"/>
+    <xacro:property name="body_height"               value="1.0"/>
+    <xacro:property name="body_weight"               value="20.0"/>
+
+    <xacro:property name="wheel_separation"          value="0.165"/>
+    <xacro:property name="wheel_radius"              value="0.07926"/>
+    <xacro:property name="wheel_thickness"           value="0.046"/>
+    <xacro:property name="wheel_weight"              value="2.0"/>
+
+    <xacro:property name="front_wheel_radius"        value="0.038"/>
+    <xacro:property name="rear_wheel_radius"         value="0.025"/>
+    <xacro:property name="rear_wheel_separation"     value="0.125"/>
+    <xacro:property name="front_wheel_x"             value="0.208"/>
+    <xacro:property name="rear_wheel_x"              value="0.182"/>
+    <xacro:property name="caster_wheel_weight"       value="0.1"/>
+    <xacro:property name="rear_wheel_offset"         value="0.02"/>
+    <xacro:property name="front_wheel_offset"        value="0.02"/>
+
+    <xacro:property name="axle_spring_x"             value="0.21"/>
+    <xacro:property name="axle_spring_z"             value="0.034"/>
+    <xacro:property name="axle_center"               value="0.094"/>
+    <xacro:property name="axle_weight"               value="2.0"/>
+    <xacro:property name="axle_max_rotation"         value="${7*pi/180}"/>
+
+    <!-- Lidars -->
+    <!-- slamtec rplidar s2 -->
+    <xacro:property name="rplidar_s2_radius"               value="${77.0/2/1000}"/>
+    <xacro:property name="rplidar_s2_height"               value="${38.85/1000}"/>
+    <!-- ydlidar tmini pro  -->
+    <xacro:property name="tmini_pro_radius"                value="${38.6/2/1000}"/>
+    <xacro:property name="tmini_pro_height"                value="${33.9/1000}"/>
+    <!-- ydlidar g2  -->
+    <xacro:property name="ydlidar_g2_radius"               value="${73.7/2.0/1000.0}"/>
+    <xacro:property name="ydlidar_g2_height"               value="${43.5/1000.0}"/>
+
+    <!-- base front lidar -  -->
+    <xacro:property name="lidar_base_front_x"              value="0.172"/>
+    <xacro:property name="lidar_base_front_y"              value="0.0"/>
+    <xacro:property name="lidar_base_front_z"              value="0.254"/>
+    <xacro:property name="lidar_base_front_yaw"            value="${1.0*pi}"/>
+    <!-- lidar base rear - ydlidar g2 -->
+    <xacro:property name="lidar_base_rear_x"               value="-0.172"/>
+    <xacro:property name="lidar_base_rear_y"               value="0.0"/>
+    <xacro:property name="lidar_base_rear_z"               value="0.254"/>
+    <xacro:property name="lidar_base_rear_yaw"             value="${1.0*pi}"/>
+
+    <xacro:property name="base_depth_cam_x"       value="0.267"/>
+    <xacro:property name="base_depth_cam_y"       value="0.0"/>
+    <xacro:property name="base_depth_cam_z"       value="0.171"/>
+    <xacro:property name="base_depth_cam_pitch"   value="${-50/180*pi}"/>
+
+    <xacro:property name="top_depth_cam_x"       value="0.25"/>
+    <xacro:property name="top_depth_cam_y"       value="0.0"/>
+    <xacro:property name="top_depth_cam_z"       value="0.96"/>
+    <xacro:property name="top_depth_cam_pitch"   value="${57/180*pi}"/>
+
+    <xacro:property name="cam_pos_x"                 value="-0.260"/>
+    <xacro:property name="cam_pos_z"                 value="0.238"/>
+
+    <xacro:property name="ultrasonic_pos_x"          value="${d435_cam_x-0.01}"/>
+    <xacro:property name="ultrasonic_pos_y"          value="0"/>
+    <xacro:property name="ultrasonic_pos_z"          value="${body_gap+0.164}"/>
+    <xacro:property name="ultrasonic_yaw"            value="0"/>
+
+    <xacro:property name="glass_pos_x"                value="0.15"/>
+    <xacro:property name="glass_pos_y"                value="0.1"/>
+    <xacro:property name="glass_height"               value="0.13"/>
+    <xacro:property name="glass_weight"               value="0.4"/>
+
+    <xacro:property name="camera_top_left_pos_x"      value="0.001766"/>
+    <xacro:property name="camera_top_left_pos_y"      value="0.187204"/>
+    <xacro:property name="camera_top_left_pos_z"      value="0.998147"/>
+    <xacro:property name="camera_top_left_roll"       value="${pi}"/>
+    <!-- <xacro:property name="camera_top_left_pitch"      value="${62.5*pi/180}"/> -->
+    <xacro:property name="camera_top_left_yaw"        value="${pi/2}"/>
+
+    <xacro:property name="camera_top_right_pos_x"     value="0.001766"/>
+    <xacro:property name="camera_top_right_pos_y"     value="-0.187204"/>
+    <xacro:property name="camera_top_right_pos_z"     value="0.998147"/>
+    <xacro:property name="camera_top_right_roll"      value="${pi}"/>
+    <!-- <xacro:property name="camera_top_right_pitch"     value="${62.5*pi/180}"/> -->
+    <xacro:property name="camera_top_right_yaw"       value="${-pi/2}"/>
+
+    <xacro:property name="camera_top_back_pos_x"      value="-0.251812"/>
+    <xacro:property name="camera_top_back_pos_y"      value="0.0"/>
+    <xacro:property name="camera_top_back_pos_z"      value="0.988413"/>
+    <xacro:property name="camera_top_back_roll"       value="0.0"/>
+    <!-- <xacro:property name="camera_top_back_pitch"      value="${32*pi/180}"/> -->
+    <xacro:property name="camera_top_back_yaw"        value="${pi}"/>
+
+</robot>

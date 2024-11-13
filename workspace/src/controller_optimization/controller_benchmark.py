@@ -366,10 +366,10 @@ class ControllerBenchmark:
             # "/transform_listener_impl_5dd763758dc0",
             # "/transform_listener_impl_61933a70ffb0",
             # "/transform_listener_impl_79ac64003470",
-            "/turtlebot3_diff_drive",
-            "/turtlebot3_imu",
-            "/turtlebot3_joint_state",
-            "/turtlebot3_laserscan"
+            # "/turtlebot3_diff_drive",
+            # "/turtlebot3_imu",
+            # "/turtlebot3_joint_state",
+            # "/turtlebot3_laserscan"
         ]
 
         missing_nodes = [node for node in expected if node not in running_nodes]

@@ -2,6 +2,7 @@
 
 import os
 import numpy as np
+import time
 import matplotlib.pyplot as plt
 
 import constants
@@ -17,6 +18,16 @@ global logger, controller_benchmark
 
 def test_benchmark():
     global controller_benchmark, logger
+
+    # init default parameters
+    default_mppi_params = ControllerParameters()
+    default_mppi_params.load_from_yaml(
+        os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
+    controller_benchmark.update_parameters(default_mppi_params)
+
+    # init test map (for faster run)
+    controller_benchmark.update_map('complex_test')
+
     controller_benchmark.launch_nodes()
     res, msg = controller_benchmark.check_launch_nodes_active()
     if not res:
@@ -35,7 +46,16 @@ def test_benchmark():
 
     fig_metric = controller_benchmark.plot_metric(result, metric)
 
-    plt.show()
+    plt.show(block=False)
+
+    # Wait for the 'q' key press
+    while True:
+        key = input("Press 'q' to quit: ").strip().lower()
+        if key == 'q':
+            break
+
+    # Close all figures
+    plt.close('all')
 
 
 def plot_last():
@@ -61,16 +81,12 @@ def main():
         logger=logger,
         config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'))
 
-    default_mppi_params = ControllerParameters()
-    default_mppi_params.load_from_yaml(
-        os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
-
-    controller_benchmark.update_parameters(default_mppi_params)
     try:
         test_benchmark()
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, stopping nodes.")
 
+    time.sleep(1)
     exit(0)
 
 

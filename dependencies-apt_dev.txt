@@ -1,3 +1,5 @@
 ros-humble-turtlebot3-gazebo
 ros-humble-navigation2
 ros-humble-nav2-bringup
+ros-humble-xacro
+ros-humble-joint-state-publisher

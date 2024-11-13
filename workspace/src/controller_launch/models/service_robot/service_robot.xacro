@@ -1,0 +1,438 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="enjoy">
+    <!-- Arguments -->
+    <!-- <xacro:arg name="validation_glass_enabled" default="false"/>
+    <xacro:arg name="camera_top_left_pitch" default="1.09"/>
+    <xacro:arg name="camera_top_right_pitch" default="1.09"/>
+    <xacro:arg name="camera_top_back_pitch" default="0.56"/> -->
+
+    <xacro:property name="validation_glass_enabled" value="false"/>
+    <xacro:property name="camera_top_left_pitch" value="1.09"/>
+    <xacro:property name="camera_top_right_pitch" value="1.09"/>
+    <xacro:property name="camera_top_back_pitch" value="0.56"/>
+
+    <xacro:include filename="$(find controller_launch)/dimensions.xacro"/>
+    <xacro:include filename="$(find controller_launch)/materials.xacro"/>
+    <xacro:include filename="$(find controller_launch)/inertias.xacro"/>
+    <xacro:include filename="$(find controller_launch)/kinematic_link.xacro"/>
+    <xacro:include filename="$(find controller_launch)/plugins.xacro"/>
+
+    <!-- Cut off the front of the base collision so the tofs can see -->
+    <xacro:property name="base_front_offset" value="0.02"/>
+
+    <xacro:property name="base_offset_z" value="${base_height/2 + bottom_gap}"/>
+
+    <link name="base_footprint"/>
+
+    <link name="base_link">
+        <xacro:box_inertia
+            m="${base_weight/10}" x="${base_length}" y="${base_width}" z="${base_height}"/>
+
+        <collision>
+            <origin xyz="0 0 ${base_height / 2 + bottom_gap}" rpy="0 0 0"/>
+            <geometry>
+                <box size="${base_length - base_front_offset} ${base_width} ${base_height}"/>
+            </geometry>
+        </collision>
+    </link>
+
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <xacro:property name="base_weight_offset" value="${base_length/8}"/>
+    <!-- <link name="battery_link">
+        <xacro:box_inertia
+            m="${base_weight}" x="${base_weight_offset*2}" y="${base_width}" z="${base_height}"/>
+    </link>
+    <joint name="battery_joint" type="fixed">
+        <parent link="base_link"/>
+        <child  link="battery_link"/>
+        <origin xyz="${-base_weight_offset} 0 ${base_offset_z}" rpy="0 0 0"/>
+    </joint> -->
+
+    <link name="body_link">
+        <visual>
+            <material name="gray"/>
+            <origin xyz="0 0 ${-base_height - bottom_gap - body_gap - body_height/2}" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file://$(find controller_launch)/robot_model.stl"/>
+            </geometry>
+        </visual>
+
+        <collision>
+            <origin xyz="-${base_front_offset/2} 0 0" rpy="0 0 0"/>
+            <geometry>
+                <box size="${base_length - base_front_offset} ${base_width} ${body_height}"/>
+            </geometry>
+        </collision>
+
+        <xacro:box_inertia
+            m="${body_weight}" x="${base_length}" y="${base_width}" z="${body_height}"/>
+    </link>
+    <joint name="body_joint" type="fixed">
+        <parent link="base_link"/>
+        <child  link="body_link"/>
+        <origin xyz="0 0 ${base_offset_z + base_height/2 + body_gap + body_height/2}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Axles -->
+    <!-- How long the end of the axle should exend over the spring -->
+    <xacro:property name="axle_over_spring" value="0.01"/>
+    <xacro:property name="axle_width" value="0.01"/>
+    <xacro:property name="axle_height" value="${-base_height/2 - bottom_gap + wheel_radius}"/>
+    <xacro:property name="axle_lenght" value="${axle_over_spring + axle_spring_x}"/>
+    <xacro:macro name="axle" params="prefix reflect">
+        <link name="${prefix}_axle_center_link">
+            <visual>
+                <material name="white"/>
+                <origin xyz="0 0 ${0.01}" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${0.01} ${0.01} ${0.01}"/>
+                </geometry>
+            </visual>
+
+            <xacro:box_inertia m="${axle_weight/2}"
+                x="${axle_lenght}" y="${axle_width}" z="${axle_spring_z}"/>
+        </link>
+        <joint name="${prefix}_axle_center_joint" type="revolute">
+            <parent link="base_link"/>
+            <origin xyz="${-axle_center} ${rear_wheel_separation*reflect} ${base_offset_z + axle_height}" rpy="0 0 0"/>
+            <child  link="${prefix}_axle_center_link"/>
+            <axis xyz="0 1 0" />
+            <limit upper="${axle_max_rotation}" lower="${-axle_max_rotation}" velocity="2" effort="1"/>
+            <dynamics damping="10.0" friction="10.0"/>
+        </joint>
+        <gazebo reference="${prefix}_axle_center_joint">
+            <springStiffness>50</springStiffness>
+        </gazebo>
+
+        <link name="${prefix}_axle_link">
+            <visual>
+                <material name="white"/>
+                <origin xyz="0 0 ${axle_spring_z/2}" rpy="0 0 0"/>
+                <geometry>
+                    <box size="${axle_lenght} ${axle_width} ${axle_spring_z}"/>
+                </geometry>
+            </visual>
+
+            <xacro:box_inertia m="${axle_weight/2}"
+                x="${axle_lenght}" y="${axle_width}" z="${axle_spring_z}"/>
+        </link>
+        <joint name="${prefix}_axle_joint" type="fixed">
+            <origin xyz="${-axle_lenght/2 + axle_center} 0 0" rpy="0 0 0"/>
+            <parent link="${prefix}_axle_center_link"/>
+            <child  link="${prefix}_axle_link"/>
+        </joint>
+    </xacro:macro>
+
+    <xacro:axle prefix="left" reflect="1"/>
+    <xacro:axle prefix="right" reflect="-1"/>
+
+
+    <!-- Diff Wheels -->
+    <xacro:macro name="wheel" params="prefix reflect">
+        <link name="${prefix}_wheel">
+            <visual>
+                <material name="white"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="file://$(find controller_launch)/wheel.dae"/>
+                </geometry>
+            </visual>
+
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="file://$(find controller_launch)/wheel.dae"/>
+                </geometry>
+            </collision>
+
+            <xacro:cylinder_inertia_y_ax m="${wheel_weight}" r="${wheel_radius}" h="${wheel_thickness}"/>
+        </link>
+
+        <joint name="${prefix}_wheel_joint" type="continuous">
+            <axis xyz="0 1 0"/>
+            <parent link="${prefix}_axle_link"/>
+            <child link="${prefix}_wheel"/>
+            <origin xyz="${axle_lenght/2} ${(wheel_separation-rear_wheel_separation)*reflect} 0"
+                rpy="0 0 0"/>
+        </joint>
+
+    </xacro:macro>
+
+    <xacro:wheel prefix="left" reflect="1"/>
+    <xacro:wheel prefix="right" reflect="-1"/>
+
+
+    <!-- Caster Wheels -->
+    <xacro:property name="caster_thickness" value="0.02"/>
+    <xacro:property name="vertical_link_radius" value="0.005"/>
+    <!-- negative of the z distance of rear caster wheel from axle center -->
+    <xacro:property name="rear_caster_z" value="${-wheel_radius + rear_wheel_radius}"/>
+    <xacro:macro name="rear_caster" params="prefix reflect">
+        <link name="${prefix}_caster_vertical_link">
+            <visual>
+                <material name="white"/>
+                <geometry>
+                    <cylinder radius="${vertical_link_radius}" length="${-rear_caster_z}"/>
+                </geometry>
+            </visual>
+
+            <xacro:cylinder_inertia_z_ax
+                m="${caster_wheel_weight/2}" r="${vertical_link_radius}" h="${-rear_caster_z}"/>
+        </link>
+        <joint name="${prefix}_caster_vertical_joint" type="continuous">
+            <parent link="${prefix}_axle_link"/>
+            <child link="${prefix}_caster_vertical_link"/>
+            <axis xyz="0 0 1"/>
+            <origin xyz="${-rear_wheel_x + axle_center + rear_wheel_offset} 0 ${rear_caster_z/2}"
+                rpy="0 0 0"/>
+        </joint>
+
+
+        <link name="${prefix}_caster">
+            <visual>
+                <material name="white"/>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="file://$(find controller_launch)/rear_wheel.dae"/>
+                </geometry>
+            </visual>
+
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <geometry>
+                    <mesh filename="file://$(find controller_launch)/rear_wheel.dae"/>
+                </geometry>
+            </collision>
+
+            <xacro:cylinder_inertia_y_ax
+                m="${caster_wheel_weight}" r="${rear_wheel_radius}" h="${caster_thickness}"/>
+        </link>
+        <joint name="${prefix}_caster_joint" type="continuous">
+            <parent link="${prefix}_caster_vertical_link"/>
+            <child link="${prefix}_caster"/>
+            <axis xyz="0 1 0"/>
+            <origin xyz="${rear_wheel_offset} 0 ${rear_caster_z/2}" rpy="0 0 0"/>
+        </joint>
+    </xacro:macro>
+
+    <xacro:rear_caster prefix="left" reflect="1"/>
+    <xacro:rear_caster prefix="right" reflect="-1"/>
+
+
+    <xacro:property name="front_wheel_height" value="${-base_height/2 - bottom_gap + front_wheel_radius}"/>
+    <link name="front_caster_vertical_link">
+        <visual>
+            <material name="white"/>
+            <geometry>
+                <cylinder radius="${vertical_link_radius}" length="${front_wheel_height/2}"/>
+            </geometry>
+        </visual>
+
+        <xacro:cylinder_inertia_z_ax
+            m="${caster_wheel_weight/2}" r="${vertical_link_radius}" h="${front_wheel_height/2}"/>
+    </link>
+    <joint name="front_caster_vertical_joint" type="continuous">
+        <parent link="base_link"/>
+        <child link="front_caster_vertical_link"/>
+        <axis xyz="0 0 1"/>
+        <origin xyz="${front_wheel_x + front_wheel_offset} 0 ${base_offset_z + front_wheel_height/2}"
+            rpy="0 0 0"/>
+    </joint>
+
+
+    <link name="front_caster">
+        <visual>
+            <material name="white"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file://$(find controller_launch)/wheel.dae" scale="0.48 0.48 0.48"/>
+            </geometry>
+        </visual>
+
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <geometry>
+                <mesh filename="file://$(find controller_launch)/wheel.dae" scale="0.48 0.48 0.48"/>
+            </geometry>
+        </collision>
+
+        <xacro:cylinder_inertia_y_ax
+            m="${caster_wheel_weight}" r="${front_wheel_radius}" h="${caster_thickness}"/>
+    </link>
+    <joint name="front_caster_joint" type="continuous">
+        <parent link="front_caster_vertical_link"/>
+        <child link="front_caster"/>
+        <axis xyz="0 1 0"/>
+        <origin xyz="${front_wheel_offset} 0 ${front_wheel_height/2}" rpy="0 0 0"/>
+    </joint>
+
+
+    <!-- Lidars -->
+    <xacro:macro name="lidar" params="prefix r h x y z roll pitch yaw">
+        <link name="${prefix}_link">
+            <visual>
+                <material name="red"/>
+                <geometry>
+                    <cylinder radius="${r}" length="${h}"/>
+                </geometry>
+            </visual>
+        </link>
+        <joint name="${prefix}_joint" type="fixed">
+            <parent link="base_link"/>
+            <child link="${prefix}_link"/>
+            <origin xyz="${x} ${y} ${z}" rpy="${roll} ${pitch} ${yaw}"/>
+        </joint>
+    </xacro:macro>
+    <xacro:lidar
+        prefix="lidar_base_front"
+        r="${rplidar_s2_radius}" h="${rplidar_s2_height}"
+        x="${lidar_base_front_x}" y="${lidar_base_front_y}" z="${lidar_base_front_z}"
+        roll="0.0" pitch="0.0" yaw="${lidar_base_front_yaw}"/>
+
+    <!-- Separate front facing lidar link -->
+    <link name="lidar_base_front_virtual_link"/>
+    <joint name="lidar_base_front_virtual_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="lidar_base_front_virtual_link"/>
+        <origin xyz="${lidar_base_front_x} ${lidar_base_front_y} ${lidar_base_front_z}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- <xacro:lidar
+        prefix="lidar_base_rear"
+        r="${ydlidar_g2_radius}" h="${ydlidar_g2_height}"
+        x="${lidar_base_rear_x}" y="${lidar_base_rear_y}" z="${lidar_base_rear_z}"
+        roll="0.0" pitch="0.0" yaw="${lidar_base_rear_yaw}"/> -->
+
+    <!-- Base Depth Camera link -->
+    <!-- <xacro:kinematic_link name="depth_camera_base">
+        <origin xyz="${base_depth_cam_x} ${base_depth_cam_y} ${base_depth_cam_z}" rpy="0 ${base_depth_cam_pitch} 0"/>
+    </xacro:kinematic_link>
+
+    <joint name="depth_camera_base_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+        <parent link="depth_camera_base_link"/>
+        <child link="depth_camera_base_link_optical"/>
+    </joint>
+    <link name="depth_camera_base_link_optical"/> -->
+
+    <!-- Top Depth Camera link -->
+    <!-- <xacro:kinematic_link name="depth_camera_top">
+        <origin xyz="${top_depth_cam_x} ${top_depth_cam_y} ${top_depth_cam_z}" rpy="0 ${top_depth_cam_pitch} 0"/>
+    </xacro:kinematic_link>
+
+    <joint name="depth_camera_top_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+        <parent link="depth_camera_top_link"/>
+        <child link="depth_camera_top_link_optical"/>
+    </joint>
+    <link name="depth_camera_top_link_optical"/> -->
+
+    <!-- IMU -->
+    <xacro:kinematic_link name="imu">
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </xacro:kinematic_link>
+
+    <!-- Validation Glass -->
+    <!-- <xacro:if value="$(arg validation_glass_enabled)">
+    <link name="glass_link">
+        <visual>
+            <origin xyz="0 0 ${-glass_height/2}" rpy="0 0 0"/>
+            <material name="white"/>
+
+            <geometry>
+                <xacro:property name="glass_scale" value="${glass_height/0.73}"/>
+                <mesh scale="${glass_scale} ${glass_scale} ${glass_scale}" filename="file:///home/ubuntu/ros2-service-robot/gazebo_models/cup/meshes/coffee_cup_blender.dae"/>
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <cylinder radius="${glass_height/2}" length="${glass_height}"/>
+            </geometry>
+        </collision>
+        <xacro:cylinder_inertia_z_ax m="${glass_weight}" r="${glass_height/2}" h="${glass_height}"/>
+    </link>
+    <joint name="glass_joint" type="fixed">
+        <parent link="body_link"/>
+        <child  link="glass_link"/>
+        <origin xyz="${glass_pos_x} ${glass_pos_y} ${glass_height/2}" rpy="0 0 0"/>
+    </joint>
+    </xacro:if> -->
+
+    <!-- Led Strips -->
+    <!-- <xacro:macro name="led_strip" params="prefix filename">
+        <link name="${prefix}_link">
+            <visual>
+                <geometry>
+                    <mesh scale="1.0 1.0 1.0" filename="${filename}"/>
+                </geometry>
+            </visual>
+        </link>
+        <joint name="${prefix}_joint" type="fixed">
+            <parent link="body_link"/>
+            <child  link="${prefix}_link"/>
+            <origin xyz="0.0 0.0 ${-base_height - bottom_gap - body_gap - body_height/2}"/>
+        </joint>
+    </xacro:macro>
+
+    <xacro:led_strip prefix="led0" filename="file://$(find controller_launch)/led0.stl"/>
+    <xacro:led_strip prefix="led1" filename="file://$(find controller_launch)/led1.stl"/>
+    <xacro:led_strip prefix="led2" filename="file://$(find controller_launch)/led2.stl"/>
+    <xacro:led_strip prefix="led3" filename="file://$(find controller_launch)/led3.stl"/> -->
+
+
+    <!-- Docking camera -->
+    <!-- <xacro:kinematic_link name="camera">
+        <origin xyz="${cam_pos_x} 0 ${cam_pos_z}" rpy="0 0 ${-pi}" />
+    </xacro:kinematic_link> -->
+
+    <!-- Bumper -->
+    <!-- <link name="bumper_link">
+        <visual>
+            <material name="black"/>
+            <geometry>
+                <mesh filename="file:///home/ubuntu/ros2-service-robot/gazebo_models/bumper/meshes/bumper.stl"/>
+            </geometry>
+        </visual>
+
+        <collision>
+            <material name="gray"/>
+            <geometry>
+                <mesh filename="file:///home/ubuntu/ros2-service-robot/gazebo_models/bumper/meshes/bumper.stl"/>
+            </geometry>
+        </collision>
+
+        <xacro:box_inertia m="${0.05}" x="0.01" y="0.1" z="0.012"/>
+    </link>
+    <joint name="bumper_joint" type="fixed">
+        <parent link="base_link"/>
+        <child  link="bumper_link"/>
+        <origin xyz="${-base_length/2 - 0.005} 0 ${wheel_radius}" rpy="0 0 0"/>
+    </joint> -->
+
+    <!-- OAK Cameras -->
+    <!-- <xacro:macro name="oak_camera" params="name child_frame x y z roll pitch yaw">
+        <xacro:kinematic_link name="${name}" base_frame="base_link">
+            <origin xyz="${x} ${y} ${z}" rpy="${roll} ${pitch} ${yaw}"/>
+        </xacro:kinematic_link>
+        <link name="${child_frame}"/>
+        <joint name="${child_frame}_joint" type="fixed">
+            <parent link="${name}_link"/>
+            <child  link="${child_frame}"/>
+        </joint>
+    </xacro:macro>
+    <xacro:oak_camera name="camera_top_left" child_frame="oak_top_left_camera_optical_frame"
+        x="${camera_top_left_pos_x}" y="${camera_top_left_pos_y}" z="${camera_top_left_pos_z}"
+        roll="${camera_top_left_roll}" pitch="$(arg camera_top_left_pitch)" yaw="${camera_top_left_yaw}"/>
+    <xacro:oak_camera name="camera_top_right" child_frame="oak_top_left_back_camera_optical_frame"
+        x="${camera_top_right_pos_x}" y="${camera_top_right_pos_y}" z="${camera_top_right_pos_z}"
+        roll="${camera_top_right_roll}" pitch="$(arg camera_top_right_pitch)" yaw="${camera_top_right_yaw}"/>
+    <xacro:oak_camera name="camera_top_back" child_frame="oak_top_back_camera_optical_frame"
+        x="${camera_top_back_pos_x}" y="${camera_top_back_pos_y}" z="${camera_top_back_pos_z}"
+        roll="${camera_top_back_roll}" pitch="$(arg camera_top_back_pitch)" yaw="${camera_top_back_yaw}"/> -->
+</robot>
