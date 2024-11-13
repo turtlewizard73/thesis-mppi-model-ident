@@ -97,3 +97,9 @@ output2: sum of costs on the path
 - több robot lespawnolása működik külön ugye
   - service robot át lett alakítvav (szenzorok kiszedve inercia a lényeg)
   - plus joint state pub megoldodda hogy kerekek nem voltak tf részei
+  - base link elé bekerült base footprint a service robotnál
+
+## 2024. 11. 13.
+- gazebo worldbe kell
+- "<plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so" >"
+  - hogy legyen spawn entity state service

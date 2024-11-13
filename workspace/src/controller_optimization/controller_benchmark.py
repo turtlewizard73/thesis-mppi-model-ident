@@ -39,6 +39,7 @@ from utils.parameter_manager import ParameterManager
 
 BASE_PATH = constants.BASE_PATH
 REPO_PATH = constants.REPO_PATH
+LAUNCH_PATH = constants.LAUNCH_PATH
 
 
 @dataclass
@@ -58,18 +59,17 @@ class ControllerBenchmark:
     def __init__(
             self, logger,
             config_path: str,
-            result_save_path: str = constants.RESULTS_PATH,
-            metric_save_path: str = constants.METRICS_PATH) -> None:
+            save_path: str = BASE_PATH) -> None:
         self.logger = logger
         self.nodes_active = False
 
-        if os.path.isdir(result_save_path) is False:
-            os.makedirs(result_save_path)
-        self.result_save_path = result_save_path
+        self.result_save_path = os.path.join(save_path, 'results')
+        if os.path.isdir(self.result_save_path) is False:
+            os.makedirs(self.result_save_path)
 
-        if os.path.isdir(metric_save_path) is False:
-            os.makedirs(metric_save_path)
-        self.metric_save_path = metric_save_path
+        self.metric_save_path = os.path.join(save_path, 'metrics')
+        if os.path.isdir(self.metric_save_path) is False:
+            os.makedirs(self.metric_save_path)
 
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
@@ -87,7 +87,6 @@ class ControllerBenchmark:
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
 
-        self.update_map(self.params['reference_map'])
         self.launch_nodes()
 
         self.results: List[ControllerResult] = []
@@ -134,10 +133,15 @@ class ControllerBenchmark:
                 yaw = data.get(map_name)['goal_pose']['yaw']
                 goal.pose.orientation = yaw2quat(yaw)
 
+                yaml_path = os.path.join(BASE_PATH, data.get(map_name)['path'])
+                if not os.path.isfile(yaml_path):
+                    yaml_path = os.path.join(LAUNCH_PATH, data.get(map_name)['path'])
+                    if not os.path.isfile(yaml_path):
+                        raise FileNotFoundError(f'Invalid path to map file: {yaml_path}')
+
                 mapdata = MapData(
                     name=map_name,
-                    yaml_path=os.path.join(
-                        BASE_PATH, data.get(map_name)['path']),
+                    yaml_path=yaml_path,  # abs path to map yaml
                     start=start,
                     goal=goal)
 
@@ -148,9 +152,7 @@ class ControllerBenchmark:
                 else:
                     mapdata.yaml_path_local = mapdata.yaml_path
 
-                map_config_path = os.path.join(
-                    BASE_PATH, mapdata.yaml_path)
-                with open(map_config_path, 'r', encoding='utf-8') as file:
+                with open(yaml_path, 'r', encoding='utf-8') as file:
                     map_config = yaml.safe_load(file)
                     mapdata.resolution = map_config['resolution']
                     mapdata.origin = np.array(
@@ -232,7 +234,7 @@ class ControllerBenchmark:
         self.nav.info('Change local map request was successful!')
         return True
 
-    def update_map(self, mapname: str) -> bool:
+    def update_map(self, mapname: str, skip_local=False) -> bool:
         mapdata = self.mapdata_dict[mapname]
 
         self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
@@ -241,12 +243,13 @@ class ControllerBenchmark:
             self.logger.error('Failed to change global map')
             return False
 
-        local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
-        self.logger.info(f'Changing local map to: {local_map_path}')
-        res = self.changeLocalMap(local_map_path)
-        if res is False:
-            self.logger.error('Failed to change local map')
-            return False
+        if skip_local is False:
+            local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
+            self.logger.info(f'Changing local map to: {local_map_path}')
+            res = self.changeLocalMap(local_map_path)
+            if res is False:
+                self.logger.error('Failed to change local map')
+                return False
 
         self.current_mapdata = mapdata
         self.nav.clearAllCostmaps()

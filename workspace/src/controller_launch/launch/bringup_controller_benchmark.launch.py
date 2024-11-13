@@ -57,7 +57,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
             with open(urdf, 'r') as urdf_file:
                 robot_description = urdf_file.read()
 
-    pose = {'x': '0.0', 'y': '0.0', 'z': '0.0',
+    pose = {'x': '0.0', 'y': '0.0', 'z': '0.1',
             'R': '0.0', 'P': '0.0', 'Y': '0.0'}
 
     # -------------------------------------------------------------------------------------
@@ -137,7 +137,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
             package='gazebo_ros',
             executable='spawn_entity.py',
             arguments=[
-                '-entity', 'service_robot',
+                '-entity', robot_name,
                 '-timeout', '60',
                 '-topic', 'robot_description',
                 '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
