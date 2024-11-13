@@ -153,8 +153,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
                 {'use_sim_time': True,
                  'rate': 10,
                  'source_list': ['/wheel_joint_states']}],
-            # condition=IfCondition(str(robot_type.perform(context) == 'enjoy'))
-        ),
+            condition=IfCondition(str(robot_type.perform(context) == 'enjoy'))),
 
         Node(
             package='nav2_map_server',

@@ -63,12 +63,6 @@
         max_angle="${115.0/180*pi}"/> -->
         <!-- [-115°;115°] -->
 
-    <!-- <joint name="base_joint" type="fixed">
-        <parent>base_footprint</parent>
-        <child>base_link</child>
-        <pose>0.0 0.0 0.010 0 0 0</pose>
-    </joint> -->
-
     <!-- Diff drive -->
     <gazebo>
         <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
@@ -76,8 +70,8 @@
             <odometry_frame>odom</odometry_frame>
             <odometry_source>1</odometry_source>
             <publish_odom_tf>true</publish_odom_tf>
-            <robot_base_frame>base_link</robot_base_frame>
-            <!-- <robot_base_frame>base_footprint</robot_base_frame> -->
+            <!-- <robot_base_frame>base_link</robot_base_frame> -->
+            <robot_base_frame>base_footprint</robot_base_frame>
             <publish_wheel_tf>false</publish_wheel_tf>
             <publish_wheel_joint_state>true</publish_wheel_joint_state>
             <legacy_mode>false</legacy_mode>
@@ -279,7 +273,8 @@
                 <remapping>odom:=odom/precise</remapping>
             </ros> -->
             <frame_name>odom</frame_name>
-            <body_name>base_link</body_name>
+            <!-- <body_name>base_link</body_name> -->
+            <body_name>base_footprint</body_name>
             <update_rate>10.0</update_rate>
         </plugin>
     </gazebo>

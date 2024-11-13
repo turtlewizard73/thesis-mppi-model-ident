@@ -23,6 +23,8 @@
 
     <xacro:property name="base_offset_z" value="${base_height/2 + bottom_gap}"/>
 
+    <link name="base_footprint"/>
+
     <link name="base_link">
         <xacro:box_inertia
             m="${base_weight/10}" x="${base_length}" y="${base_width}" z="${base_height}"/>
@@ -34,8 +36,15 @@
             </geometry>
         </collision>
     </link>
+
+    <joint name="base_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
     <xacro:property name="base_weight_offset" value="${base_length/8}"/>
-    <link name="battery_link">
+    <!-- <link name="battery_link">
         <xacro:box_inertia
             m="${base_weight}" x="${base_weight_offset*2}" y="${base_width}" z="${base_height}"/>
     </link>
@@ -43,7 +52,7 @@
         <parent link="base_link"/>
         <child  link="battery_link"/>
         <origin xyz="${-base_weight_offset} 0 ${base_offset_z}" rpy="0 0 0"/>
-    </joint>
+    </joint> -->
 
     <link name="body_link">
         <visual>

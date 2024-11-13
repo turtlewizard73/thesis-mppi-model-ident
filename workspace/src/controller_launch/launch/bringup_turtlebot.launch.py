@@ -3,16 +3,20 @@ import os
 # ROS modules
 from launch import LaunchDescription
 from ament_index_python.packages import get_package_share_directory
-from launch.actions import (IncludeLaunchDescription, DeclareLaunchArgument)
+from launch.actions import (
+    IncludeLaunchDescription, DeclareLaunchArgument, OpaqueFunction)
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch.conditions import IfCondition
 from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import RewrittenYaml
 from launch.substitutions import LaunchConfiguration
+from launch.launch_context import LaunchContext
+
+import xacro
 
 
-def generate_launch_description():
+def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
     this_package_dir = get_package_share_directory('controller_launch')
     nav2_bringup_dir = get_package_share_directory('nav2_bringup')
     gazebo_dir = get_package_share_directory('gazebo_ros')
@@ -25,23 +29,9 @@ def generate_launch_description():
     use_respawn = 'False'
 
     rviz_config_file = os.path.join(this_package_dir, 'rviz_default_view.rviz')
-    world = os.path.join(this_package_dir, 'world_only.world')
-    urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
-    with open(urdf, 'r', encoding='utf-8') as file:
-        robot_description = file.read()
-
-    # nav2 shenanigans
-    remappings = [('/tf', 'tf'),
-                  ('/tf_static', 'tf_static')]
-
-    robot_name = 'turtlebot3_waffle'
-    robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
-    pose = {'x': '-2.0', 'y': '-0.5', 'z': '0.01', 'R': '0', 'P': '0', 'Y': '0'}
-
     map_yaml_file = os.path.join(this_package_dir, 'turtlebot3_world.yaml')
-
+    world = os.path.join(this_package_dir, 'world_only.world')
     nav2_params_file = os.path.join(this_package_dir, 'nav2_params_default.yaml')
-
     param_substitutions = {
         'use_sim_time': use_sim_time,
         'yaml_filename': map_yaml_file}
@@ -52,6 +42,40 @@ def generate_launch_description():
             param_rewrites=param_substitutions,
             convert_types=True),
         allow_substs=True)
+
+    # nav2 shenanigans
+    remappings = [('/tf', 'tf'),
+                  ('/tf_static', 'tf_static')]
+
+    # custom robot type
+    robot_type = LaunchConfiguration('rt')
+    match robot_type.perform(context=context):
+        case 'enjoy':
+            urdf = os.path.join(this_package_dir, 'service_robot.urdf')
+            robot_name = 'service_robot'
+            robot_sdf = os.path.join(this_package_dir, 'burger_model.sdf')  # TODO: change
+            robot_description = xacro.process_file(
+                os.path.join(this_package_dir, 'service_robot.xacro')).toprettyxml()
+        case 'burger':
+            urdf = os.path.join(this_package_dir, 'turtlebot3_burger.urdf')
+            robot_name = 'turtlebot3_burger'
+            robot_sdf = os.path.join(this_package_dir, 'burger_model.sdf')
+            with open(urdf, 'r') as urdf_file:
+                robot_description = urdf_file.read()
+        case _:
+            urdf = os.path.join(this_package_dir, 'turtlebot3_waffle.urdf')
+            robot_name = 'turtlebot3_waffle'
+            robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
+            with open(urdf, 'r') as urdf_file:
+                robot_description = urdf_file.read()
+
+    # urdf = os.path.join(nav2_bringup_dir, 'urdf', 'turtlebot3_waffle.urdf')
+    # with open(urdf, 'r', encoding='utf-8') as file:
+    #     robot_description = file.read()
+
+    # robot_name = 'turtlebot3_waffle'
+    # robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
+    pose = {'x': '-2.0', 'y': '-0.5', 'z': '0.01', 'R': '0', 'P': '0', 'Y': '0'}
 
     # -------------------------------------------------------------------------------------
     # Nodes, processes:                         -> task                 - config file
@@ -66,15 +90,7 @@ def generate_launch_description():
     # nav2/localization_launch.py               -> localization         - map, params
     # turtlebot_navigation.launch.py            -> navigation           - params
 
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'gui', default_value='True',
-            description='Whether to run gazebo headless.'),
-
-        DeclareLaunchArgument(
-            'use_composition', default_value='True',
-            description='Whether to use composition.'),
-
+    return [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(nav2_bringup_dir, 'launch', 'rviz_launch.py')),
@@ -96,6 +112,7 @@ def generate_launch_description():
             launch_arguments={'verbose': 'true'}.items(),
             condition=IfCondition(gui)),
 
+        # state publisher
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -117,8 +134,32 @@ def generate_launch_description():
                 '-timeout', '60',
                 '-robot_namespace', namespace,
                 '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
-                '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']]),
+                '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']],
+            condition=IfCondition(str(robot_type.perform(context) != 'enjoy'))),
 
+        Node(
+            package='gazebo_ros',
+            executable='spawn_entity.py',
+            arguments=[
+                '-entity', 'service_robot',
+                '-timeout', '60',
+                '-topic', 'robot_description',
+                '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
+                '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']],
+            output='screen',
+            condition=IfCondition(str(robot_type.perform(context) == 'enjoy'))),
+
+        Node(
+            package='joint_state_publisher',
+            executable='joint_state_publisher',
+            output='log',
+            parameters=[
+                {'use_sim_time': True,
+                 'rate': 10,
+                 'source_list': ['/wheel_joint_states']}],
+            condition=IfCondition(str(robot_type.perform(context) == 'enjoy'))),
+
+        # nav2 stuff
         Node(
             condition=IfCondition(use_composition),
             name='nav2_container',
@@ -152,4 +193,25 @@ def generate_launch_description():
                               'use_composition': use_composition,
                               'use_respawn': use_respawn,
                               'container_name': 'nav2_container'}.items()),
-    ])
+    ]
+
+
+def generate_launch_description() -> LaunchDescription:
+    declared_arguments = [
+        DeclareLaunchArgument(
+            'gui', default_value='True',
+            description='Whether to run gazebo headless.'),
+
+        DeclareLaunchArgument(
+            'use_composition', default_value='True',
+            description='Whether to use composition.'),
+
+        DeclareLaunchArgument(
+            'rt', default_value='waffle',
+            description='Robot type: waffle, burger, or enjoy.'
+        ),
+    ]
+
+    return LaunchDescription(
+        declared_arguments + [OpaqueFunction(function=launch_setup)]
+    )
