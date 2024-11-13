@@ -53,6 +53,7 @@ def run_benchmark_trial(
     global benchmark, logger
 
     benchmark.update_parameters(params)
+    benchmark.update_map('complex_ref')
     result = benchmark.run_benchmark(run_uid=trial_id, timeout=timeout)
 
     if not result.success:

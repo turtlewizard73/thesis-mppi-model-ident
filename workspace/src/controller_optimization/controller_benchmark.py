@@ -298,7 +298,7 @@ class ControllerBenchmark:
             self.nodes_active = True
 
         except Exception as e:
-            raise RuntimeError(f'Failed to launch nodes: {e}')
+            raise RuntimeError(f'Failed to launch nodes: {e}') from e
 
     def _spin_executor(self, executor):
         try:
@@ -333,7 +333,7 @@ class ControllerBenchmark:
             self.nodes_active = False
 
         except Exception as e:
-            raise RuntimeError(f'Failed to stop nodes: {e}')
+            raise RuntimeError(f'Failed to stop nodes: {e}') from e
 
     @timing_decorator(
         lambda self: self.logger.info('Checking if nodes are active...'),
@@ -493,6 +493,25 @@ class ControllerBenchmark:
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
 
+        # add everything calculated outside to result
+        result.time_elapsed = time_elapsed
+        result.success = True
+        result.status_msg = 'Success'
+        result.path_xy = path_xy
+        result.path_omega = path_omega
+        self.get_result(result, start_time, end_time)
+
+        if store_result is True:
+            self.results.append(result)
+
+        return result
+
+    def get_result(
+            self,
+            result: ControllerResult,
+            start_time: rclpy.clock.Time,
+            end_time: rclpy.clock.Time) -> None:
+
         odom_xy, odom_omega, odom_t = self.odom_sub.get_data_between(
             start_time.nanoseconds, end_time.nanoseconds)
         cmd_vel_xy, cmd_vel_omega, cmd_vel_t = self.cmd_vel_sub.get_data_between(
@@ -504,24 +523,25 @@ class ControllerBenchmark:
         costmap_msg: Costmap = self.nav.getLocalCostmap()
         size_x = costmap_msg.metadata.size_x
         size_y = costmap_msg.metadata.size_y
-        costmap_array = np.array(costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
+        costmap_array = np.array(
+            costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
         costmap_array = np.flip(costmap_array, 0)
 
         map_resolution = costmap_msg.metadata.resolution
         origin_x = costmap_msg.metadata.origin.position.x
         origin_y = costmap_msg.metadata.origin.position.y
         path_costs = []
-        for x, y in path_xy:
+        for x, y in result.path_xy:
             x_idx = int((x - origin_x) / map_resolution)
             y_idx = int((y - origin_y) / map_resolution)
             path_costs.append(costmap_msg.data[y_idx * size_x + x_idx])
 
         result.start_time = start_time.nanoseconds * 1e-9
-        result.time_elapsed = time_elapsed
-        result.success = True
-        result.status_msg = 'Success'
-        result.path_xy = path_xy
-        result.path_omega = path_omega
+        # result.time_elapsed = time_elapsed
+        # result.success = True
+        # result.status_msg = 'Success'
+        # result.path_xy = path_xy
+        # result.path_omega = path_omega
         result.odom_xy = odom_xy
         result.odom_omega = odom_omega
         result.odom_t = odom_t
@@ -533,23 +553,7 @@ class ControllerBenchmark:
         result.costmap = costmap_array
         result.path_costs = np.array(path_costs)
 
-        if store_result is True:
-            self.results.append(result)
-
         return result
-
-    @timing_decorator(
-        lambda self: self.logger.info('Running batch...'),
-        lambda self, ex_time: self.logger.info(f'Batch finished in {ex_time:.4f} seconds.'))
-    def run_batch(self, parameters: list[dict]) -> list[dict[int, bool]]:
-        # make a list to store if the benchmark was successful
-        results: list[dict[int, bool]] = []
-
-        for i, params in enumerate(parameters):
-            success = self.run_benchmark(parameters=params, store_results=True)
-            results.append({i: success})
-
-        return results
 
     @timing_decorator(
         lambda self: self.logger.info('Calculating metric...'),
@@ -574,10 +578,13 @@ class ControllerBenchmark:
 
             time_elapsed=result.time_elapsed,
             success=result.success,
+            status_msg=result.status_msg,
+            path_xy=result.path_xy,
+            odom_xy=result.odom_xy,
+            cmd_vel_t=result.cmd_vel_t,
+
             distance_to_goal=distance_to_goal,
             angle_to_goal=angle_to_goal / np.pi * 180,  # rad to deg
-
-            path_xy=result.path_xy,
 
             linear_velocity=result.cmd_vel_xy[:, 0],
             avg_linear_velocity=np.mean(result.cmd_vel_xy[:, 0]),
@@ -737,7 +744,8 @@ class ControllerBenchmark:
             map_img, cmap='gray', aspect='auto',
             interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
 
-        ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label='Plan', color='g')
+        if result.path_xy.shape[0] > 0:
+            ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label='Plan', color='g')
         ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label='Route', color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
@@ -765,8 +773,7 @@ class ControllerBenchmark:
 
         return fig
 
-    def plot_metric(
-            self, result: ControllerResult, metric: ControllerMetric) -> Figure:
+    def plot_metric(self, metric: ControllerMetric) -> Figure:
         self.logger.info('Generating metric plot.')
 
         # plot1: same as result plot
@@ -796,16 +803,17 @@ class ControllerBenchmark:
             interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
 
         plan_label = f'Plan - dist: {metric.distance_to_goal:.2f} [m]'
-        ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label=plan_label, color='g')
+        if metric.path_xy.shape[0] > 0:
+            ax_plan.plot(metric.path_xy[:, 0], metric.path_xy[:, 1], label=plan_label, color='g')
         time_s = metric.time_elapsed
         route_label = f'Route - time: {time_s:.2f} [s]'
-        ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label=route_label, color='r')
+        ax_plan.plot(metric.odom_xy[:, 0], metric.odom_xy[:, 1], label=route_label, color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
 
         # jerk graph
         # ax_jerk.set_title('Jerk')
-        cmd_vel_t_s = result.cmd_vel_t
+        cmd_vel_t_s = metric.cmd_vel_t
         ax_jerk.set_xlabel('Time [s]')
         ax_jerk.set_ylabel('Jerk [m/s^3], [rad/s^3]')
         label = f'Linear jerk - RMS: {metric.rms_linear_jerk:.2f} [m/s^3]'
@@ -816,6 +824,5 @@ class ControllerBenchmark:
         ax_jerk.legend()
 
         # TODO: make nicer data vis
-        self.logger.info(metric.to_table_string())
 
         return fig
