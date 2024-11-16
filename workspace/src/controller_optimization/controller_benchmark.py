@@ -64,12 +64,7 @@ class ControllerBenchmark:
         self.nodes_active = False
 
         self.result_save_path = os.path.join(save_path, 'results')
-        if os.path.isdir(self.result_save_path) is False:
-            os.makedirs(self.result_save_path)
-
         self.metric_save_path = os.path.join(save_path, 'metrics')
-        if os.path.isdir(self.metric_save_path) is False:
-            os.makedirs(self.metric_save_path)
 
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
@@ -95,6 +90,13 @@ class ControllerBenchmark:
         self.logger.info('Destructor called.')
         if self.nodes_active is True:
             self.stop_nodes()
+
+    def setup_directories(self):
+        if os.path.isdir(self.result_save_path) is False:
+            os.makedirs(self.result_save_path)
+
+        if os.path.isdir(self.metric_save_path) is False:
+            os.makedirs(self.metric_save_path)
 
     @timing_decorator(
         lambda self: self.logger.info('Loading config...'),
@@ -614,6 +616,8 @@ class ControllerBenchmark:
             self, result: ControllerResult,
             output_dir: str = '', uid: str = '') -> str:
         self.logger.info(f'Saving result: {result.map_name}.')
+        self.setup_directories()
+
         output_dir = output_dir if output_dir != '' else \
             self.result_save_path
 
@@ -666,6 +670,8 @@ class ControllerBenchmark:
             self, metric: ControllerMetric,
             output_dir: str = '', uid: str = '') -> str:
         self.logger.info(f'Saving result: {metric.map_name}.')
+        self.setup_directories()
+
         output_dir = output_dir if output_dir != '' else self.metric_save_path
 
         if os.path.isdir(output_dir) is False:
