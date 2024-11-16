@@ -104,7 +104,7 @@ def main():
 
     output_dict = {
         'id': str(trials),
-        'success': False,
+        'success': True,
         'score': ref_score,
         'time_elapsed': ref_metric.time_elapsed,
         'avg_cost': ref_metric.avg_cost,
@@ -117,12 +117,15 @@ def main():
     pd.DataFrame([new_row]).to_csv(
         os.path.join(WORK_DIR, 'output_result.csv'), mode='a', header=True, index=False)
 
+    logger.info("_____ Start Bayesian optimization _____")
+
     res = gp_minimize(
         benchmark_function,  # the function to minimize
         [(0.01, 100.0)] * 8,  # the bounds on each dimension of x
         acq_func="EI",  # the acquisition function
         n_calls=1000,  # the number of evaluations of f
-        n_random_starts=1,  # the number of random initialization points
+        initial_point_generator="lhs",
+        n_random_starts=50,  # the number of random initialization points
         noise=0.1**2,  # the noise level (optional)
         random_state=1234  # the random seed
     )

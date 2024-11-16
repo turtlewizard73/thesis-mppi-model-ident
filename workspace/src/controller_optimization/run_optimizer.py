@@ -89,18 +89,19 @@ def run_benchmark_trial(
 
 
 def main():
+    NAME = 'distribution'
+
     global logger, default_mppi_params, benchmark
     logger = setup_run('Search', os.path.join(BASE_PATH, 'logs'))
     stamp = time.strftime('%Y-%m-%d-%H-%M')
-    WORK_DIR = os.path.join(OPTIMIZATION_OUTPUT_PATH, f'random_search_{stamp}')
+    WORK_DIR = os.path.join(OPTIMIZATION_OUTPUT_PATH, f'{NAME}_{stamp}')
     output_csv = os.path.join(WORK_DIR, 'output_result.csv')
     output_rows = []
 
     benchmark = ControllerBenchmark(
         logger=logger.getChild('Benchmark'),
         config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'),
-        result_save_path=os.path.join(WORK_DIR, 'results'),
-        metric_save_path=os.path.join(WORK_DIR, 'metrics'))
+        save_path=WORK_DIR)
 
     # Initialize default controller parameters
     default_mppi_params = ControllerParameters()
@@ -109,6 +110,7 @@ def main():
 
     # run default benchmark
     benchmark.launch_nodes()
+    benchmark.update_map('complex_ref')
     benchmark.update_parameters(default_mppi_params)
     ref_result = benchmark.run_benchmark(run_uid='reference')
 
@@ -133,11 +135,11 @@ def main():
         **default_mppi_params.to_dict()
     }
     output_rows.append(ref_output_dict)
-    output_df = pd.DataFrame(output_rows).to_csv(output_csv, index=False)
+    pd.DataFrame(output_rows).to_csv(output_csv, index=False)
 
     # setup search parameters
     TIMEOUT = ref_metric.time_elapsed * 2
-    num_trials = 30
+    num_trials = 10
 
     best_score = ref_score
     best_params = deepcopy(default_mppi_params)
@@ -151,9 +153,11 @@ def main():
         successful_trials = 0
         for i in range(1, num_trials + 1):
             # get new parameters
-            test_params.randomize_weights(
-                distribution='uniform', lower_bound=0.1, upper_bound=100.0,
-                decimals=0)
+
+            # test_params.randomize_weights(
+            #     distribution='uniform', lower_bound=0.1, upper_bound=100.0,
+            #     decimals=0)
+
             logger.info(f"___ Starting trial {i}/{num_trials} ___")
 
             trial_result = run_benchmark_trial(test_params, i, TIMEOUT)
