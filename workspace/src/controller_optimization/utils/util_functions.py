@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 # Common modules
+import csv
 import os
 import argparse
 import logging
@@ -114,6 +115,17 @@ def reformat_yaml(input_path: str, output_path: str):
 
     with open(output_path, 'w', encoding='utf-8') as file:
         file.write(yaml.dump(flat_data, default_flow_style=None))
+
+
+def numpy_dict_to_list(d: dict) -> dict:
+    for key, value in d.items():
+        if isinstance(value, dict):
+            d[key] = numpy_dict_to_list(value)
+        elif isinstance(value, np.ndarray):
+            d[key] = value.tolist()
+        elif isinstance(value, np.float64):
+            d[key] = float(value)
+    return d
 
 
 def yaw2quat(yaw: float) -> Quaternion:

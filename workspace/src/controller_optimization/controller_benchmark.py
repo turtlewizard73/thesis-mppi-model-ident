@@ -832,3 +832,6 @@ class ControllerBenchmark:
         # TODO: make nicer data vis
 
         return fig
+
+    def get_timestamp(self) -> str:
+        return time.strftime(self.params['timestamp_format'])
