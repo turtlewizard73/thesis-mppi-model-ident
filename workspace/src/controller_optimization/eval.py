@@ -1,4 +1,5 @@
 import os
+import time
 from typing import Dict, List
 
 import numpy as np
@@ -25,16 +26,26 @@ def main():
     )
 
     output_dict = {}
+    metric_dict: Dict[str, List[ControllerMetric]] = {}
+    concatted_csv = os.path.join(WORK_DIR, 'output_all.csv')
+    if os.path.exists(concatted_csv):
+        os.remove(concatted_csv)
 
     for benchmark in os.listdir(WORK_DIR):
         benchmark_path = os.path.join(WORK_DIR, benchmark)
         if not os.path.isdir(benchmark_path):
             continue
 
-        metrics_list: List[ControllerMetric] = []
-        benchmark_output_dict = {}
+        logger.info('___ Concatting csv-s ___')
+
+        benchmark_df = pd.read_csv(os.path.join(benchmark_path, 'output_result.csv'))
+        benchmark_df['id'] = benchmark
+        header_t = True if not os.path.exists(concatted_csv) else False
+        benchmark_df.to_csv(concatted_csv, mode='a', header=header_t, index=False)
 
         logger.info('___ Loading metrics for benchmark %s ___', benchmark)
+        metrics_list: List[ControllerMetric] = []
+        benchmark_output_dict = {}
         for metric in os.listdir(os.path.join(benchmark_path, 'metrics')):
             if not metric.endswith('.pickle'):
                 continue
@@ -98,6 +109,7 @@ def main():
         # _____ LINEAR ACCELERATION _____
         linear_accelerations = np.concatenate(
             [metric.linear_acceleration for metric in metrics_list])
+        linear_accelerations = np.abs(linear_accelerations)
         maximums = np.array([metric.max_linear_acceleration for metric in metrics_list])
         rmss = np.array([metric.rms_linear_acceleration for metric in metrics_list])
         benchmark_output_dict.update({
@@ -127,13 +139,10 @@ def main():
         })
 
         # _____ ANGULAR JERK _____
-        angular_jerks = np.concatenate([metric.angular_jerks for metric in metrics_list])
         rms_jerks = np.array([metric.rms_angular_jerk for metric in metrics_list])
         benchmark_output_dict.update({
-            'angular_jerk_avg': np.mean(angular_jerks),
-            'angular_jerk_std': np.std(angular_jerks),
-            'rms_angular_jerk': rms_jerks,
             'rms_angular_jerk_avg': np.mean(rms_jerks),
+            'rms_angular_jerk_std': np.std(rms_jerks),
         })
 
         # _____ COSTS _____
@@ -144,21 +153,27 @@ def main():
         })
 
         output_dict[benchmark] = benchmark_output_dict
+        metric_dict[benchmark] = metrics_list
         logger.info('___ Finished benchmark %s ___', benchmark)
         logger.info('_' * 20)
 
     logger.info('Finished evaluation')
 
+    # _____ SAVE OUTPUT _____
     # make output dict saveable, convert numpy arrays to lists
     output_dict = numpy_dict_to_list(output_dict)
 
     # Save output dict to file
-    stamp = cb.get_timestamp()
-    output_path = os.path.join(WORK_DIR, f'evaluation_output{stamp}.yaml')
-    with open(output_path, 'w', encoding='utf-8') as file:
+    output_yaml_path = os.path.join(WORK_DIR, 'evaluation_output.yaml')
+    if os.path.exists(output_yaml_path):
+        os.remove(output_yaml_path)
+
+    with open(output_yaml_path, 'w', encoding='utf-8') as file:
         yaml.safe_dump(output_dict, file, default_flow_style=None, sort_keys=False)
 
-    output_csv = os.path.join(WORK_DIR, f'evaluation_output{stamp}.csv')
+    output_csv = os.path.join(WORK_DIR, 'evaluation_output.csv')
+    if os.path.exists(output_csv):
+        os.remove(output_csv)
 
     for benchmark, data in output_dict.items():
         keys = list(data.keys())
@@ -169,6 +184,42 @@ def main():
         header = True if not os.path.exists(output_csv) else False
         pd.DataFrame([{'name': benchmark, **data}]).to_csv(
             output_csv, mode='a', header=header, index=False)
+
+    cb.stop_nodes()
+    time.sleep(2)
+
+    def plot_bar(data: pd.DataFrame, x: str, y: str, yerr: str, save_path: str, y_label: str = ''):
+        plt.figure()
+        plt.bar(data[x], data[y], yerr=data[yerr], color=['skyblue', 'lightgreen', 'salmon'])
+        plt.xlabel('robot')
+        plt.ylabel(y_label)
+        plt.grid(visible=True, which='both', axis='both')
+        plt.savefig(save_path, bbox_inches='tight', dpi=500)
+        plt.close()
+
+    # _____ PLOT METRICS from output_dict _____
+    # PLOT_DIR = os.path.join(WORK_DIR, 'plots')
+    PLOT_DIR = WORK_DIR
+    if not os.path.exists(PLOT_DIR):
+        os.makedirs(PLOT_DIR)
+    data = pd.read_csv(output_csv)
+    plot_bar(data, 'name', 'distance_to_goal_avg', 'distance_to_goal_std',
+             os.path.join(PLOT_DIR, 'plot01_distance_to_goal.png'), 'distance to goal [m]')
+
+    plot_bar(data, 'name', 'angle_to_goal_avg', 'angle_to_goal_std',
+             os.path.join(PLOT_DIR, 'plot02_angle_to_goal.png'), 'angle to goal [rad]')
+
+    plot_bar(data, 'name', 'linear_velocity_avg', 'linear_velocity_std',
+             os.path.join(PLOT_DIR, 'plot03_linear_velocity.png'), 'linear velocity [m/s]')
+
+    plot_bar(data, 'name', 'linear_acc_avg', 'linear_acc_std',  # minimal
+             os.path.join(PLOT_DIR, 'plot04_linear_acc.png'), 'linear acceleration [m/s^2]')
+
+    plot_bar(data, 'name', 'rms_angular_jerk_avg', 'rms_angular_jerk_std',
+             os.path.join(PLOT_DIR, 'plot05_linear_jerk.png'), 'linear jerk [m/s^3]')
+
+    plot_bar(data, 'name', 'costs_avg', 'costs_std',
+             os.path.join(PLOT_DIR, 'plot06_costs.png'), 'costs')
 
 
 if __name__ == '__main__':

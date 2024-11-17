@@ -46,12 +46,24 @@ def score_random_search(metric: ControllerMetric) -> float:
 
 
 def generator_grid():
-    global default_mppi_params, test_params
+    global default_mppi_params, test_params, num_trials
+    num_trials = len(constants.DEFAULT_MPPI_CRITIC_NAMES) * 101
+
+    i = 1
     for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
         test_params = deepcopy(default_mppi_params)
         grid_space = np.arange(0, 101, 1)
         for v in grid_space:
-            yield test_params.set_critic_weight(critic, v)
+            test_params.set_critic_weight(critic, v)
+            yield i
+            i += 1
+
+
+def generator_default():
+    global default_mppi_params, test_params, num_trials
+    num_trials = 100
+    for i in range(1, num_trials + 1):
+        yield i
 
 
 def run_benchmark_trial(
@@ -96,9 +108,11 @@ def run_benchmark_trial(
 
 
 def main():
-    NAME = 'grid_search_enjoy'
+    NAME = 'default_waffle_100'
 
-    global logger, default_mppi_params, benchmark, test_params
+    global logger, default_mppi_params, benchmark, test_params, num_trials
+    num_trials = 0
+
     logger = setup_run('Search', os.path.join(BASE_PATH, 'logs'))
     stamp = time.strftime('%Y-%m-%d-%H-%M')
     WORK_DIR = os.path.join(OPTIMIZATION_OUTPUT_PATH, f'{NAME}_{stamp}')
@@ -146,10 +160,10 @@ def main():
 
     # setup search parameters
     TIMEOUT = ref_metric.time_elapsed * 2
-    num_trials = 10
-
     best_score = ref_score
-    best_params = deepcopy(default_mppi_params)
+    best_params = ControllerParameters()
+    best_params.controller_name = default_mppi_params.controller_name
+    best_params.critics = default_mppi_params.critics
     best_metric_path = ref_metric_path
 
     test_params = deepcopy(default_mppi_params)
@@ -158,7 +172,7 @@ def main():
     try:
         loop_start_time = time.time()
         successful_trials = 0
-        for i, _ in enumerate(generator_grid(), start=1):
+        for i in generator_default():
             # get new parameters
 
             # test_params.randomize_weights(

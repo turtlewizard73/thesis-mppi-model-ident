@@ -15,6 +15,7 @@ services:
       - MAKEFLAGS="-j6 -l6"
       - ROS_DOMAIN_ID=73
       - TURTLE_HOME_IP=100.85.120.127
+      - GAZEBO_MASTER_URI=localhost:11345
       # - MIXINS
       # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
     logging:
