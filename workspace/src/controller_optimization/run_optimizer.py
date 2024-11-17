@@ -3,10 +3,8 @@ import os
 import numpy as np
 import time
 import yaml
-import pickle
 from copy import deepcopy
 import pandas as pd
-import re
 
 import constants
 from controller_benchmark import ControllerBenchmark
@@ -17,7 +15,7 @@ from utils.controller_metrics import ControllerMetric
 BASE_PATH = constants.BASE_PATH
 LAUNCH_PATH = constants.LAUNCH_PATH
 OPTIMIZATION_OUTPUT_PATH = constants.OPTIMIZATION_OUTPUT_PATH
-global logger, benchmark
+global logger, benchmark, test_params
 
 
 def score_random_search(metric: ControllerMetric) -> float:
@@ -45,6 +43,14 @@ def score_random_search(metric: ControllerMetric) -> float:
     )
 
     return float(score)
+
+
+def generator_grid():
+    global test_params
+    for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+        grid_space = np.arange(0, 101, 1)
+        for v in grid_space:
+            yield test_params.set_critic_weight(critic, v)
 
 
 def run_benchmark_trial(
@@ -91,7 +97,7 @@ def run_benchmark_trial(
 def main():
     NAME = 'distribution'
 
-    global logger, default_mppi_params, benchmark
+    global logger, default_mppi_params, benchmark, test_params
     logger = setup_run('Search', os.path.join(BASE_PATH, 'logs'))
     stamp = time.strftime('%Y-%m-%d-%H-%M')
     WORK_DIR = os.path.join(OPTIMIZATION_OUTPUT_PATH, f'{NAME}_{stamp}')
@@ -145,13 +151,13 @@ def main():
     best_params = deepcopy(default_mppi_params)
     best_metric_path = ref_metric_path
 
-    test_params = ControllerParameters()
+    test_params = deepcopy(default_mppi_params)
     benchmark.update_map('complex_ref')
 
     try:
         loop_start_time = time.time()
         successful_trials = 0
-        for i in range(1, num_trials + 1):
+        for i in enumerate(generator_grid(), start=1):
             # get new parameters
 
             # test_params.randomize_weights(
@@ -164,17 +170,17 @@ def main():
             if trial_result['success'] is True:
                 successful_trials += 1
 
-            if trial_result['success'] is True and (trial_result['score'] < best_score):
-                best_score = trial_result['score']
-                best_params = deepcopy(test_params)
-                best_metric_path = trial_result['metric_path']
+                if trial_result['success'] is True and (trial_result['score'] < best_score):
+                    best_score = trial_result['score']
+                    best_params = deepcopy(test_params)
+                    best_metric_path = trial_result['metric_path']
 
-            new_row = {**trial_result, **test_params.to_dict()}
-            output_rows.append(new_row)
-            pd.DataFrame([new_row]).to_csv(output_csv, mode='a', header=False, index=False)
+                new_row = {**trial_result, **test_params.to_dict()}
+                output_rows.append(new_row)
+                pd.DataFrame([new_row]).to_csv(output_csv, mode='a', header=False, index=False)
 
-            logger.info(
-                f"___ Trial {i}/{num_trials} finished with score: {trial_result['score']} ___")
+                logger.info(
+                    f"___ Trial {i}/{num_trials} finished with score: {trial_result['score']} ___")
 
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, stopping.")

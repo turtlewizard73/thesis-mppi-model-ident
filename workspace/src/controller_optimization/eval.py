@@ -26,7 +26,6 @@ def main():
 
     output_dict = {}
 
-    metrics_dict: Dict[str, ControllerMetric] = {}
     for benchmark in os.listdir(WORK_DIR):
         benchmark_path = os.path.join(WORK_DIR, benchmark)
         if not os.path.isdir(benchmark_path):
