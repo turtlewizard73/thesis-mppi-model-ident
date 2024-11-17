@@ -15,7 +15,7 @@ from utils.controller_metrics import ControllerMetric
 BASE_PATH = constants.BASE_PATH
 LAUNCH_PATH = constants.LAUNCH_PATH
 OPTIMIZATION_OUTPUT_PATH = constants.OPTIMIZATION_OUTPUT_PATH
-global logger, benchmark, test_params
+global logger, benchmark, default_mppi_params, test_params
 
 
 def score_random_search(metric: ControllerMetric) -> float:
@@ -46,8 +46,9 @@ def score_random_search(metric: ControllerMetric) -> float:
 
 
 def generator_grid():
-    global test_params
+    global default_mppi_params, test_params
     for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+        test_params = deepcopy(default_mppi_params)
         grid_space = np.arange(0, 101, 1)
         for v in grid_space:
             yield test_params.set_critic_weight(critic, v)
@@ -95,7 +96,7 @@ def run_benchmark_trial(
 
 
 def main():
-    NAME = 'distribution'
+    NAME = 'grid_search_enjoy'
 
     global logger, default_mppi_params, benchmark, test_params
     logger = setup_run('Search', os.path.join(BASE_PATH, 'logs'))
@@ -157,7 +158,7 @@ def main():
     try:
         loop_start_time = time.time()
         successful_trials = 0
-        for i in enumerate(generator_grid(), start=1):
+        for i, _ in enumerate(generator_grid(), start=1):
             # get new parameters
 
             # test_params.randomize_weights(
