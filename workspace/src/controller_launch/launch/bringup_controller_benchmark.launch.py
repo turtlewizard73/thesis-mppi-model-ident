@@ -106,7 +106,8 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
                 os.path.join(nav2_bringup_dir, 'launch', 'rviz_launch.py')),
             launch_arguments={'namespace': '',
                               'rviz_config_file': rviz_config_file,
-                              'use_namespace': 'False'}.items()),
+                              'use_namespace': 'False'}.items(),
+            condition=IfCondition(gui)),
 
         Node(
             package='robot_state_publisher',
