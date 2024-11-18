@@ -40,19 +40,19 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
     match robot_type.perform(context=context):
         case 'enjoy':
             urdf = os.path.join(this_package_dir, 'service_robot.urdf')
-            robot_name = 'service_robot'
+            robot_name = 'enjoy'
             robot_sdf = os.path.join(this_package_dir, 'burger_model.sdf')  # TODO: change
             robot_description = xacro.process_file(
                 os.path.join(this_package_dir, 'service_robot.xacro')).toprettyxml()
         case 'burger':
             urdf = os.path.join(this_package_dir, 'turtlebot3_burger.urdf')
-            robot_name = 'turtlebot3_burger'
+            robot_name = 'burger'
             robot_sdf = os.path.join(this_package_dir, 'burger_model.sdf')
             with open(urdf, 'r') as urdf_file:
                 robot_description = urdf_file.read()
         case _:
             urdf = os.path.join(this_package_dir, 'turtlebot3_waffle.urdf')
-            robot_name = 'turtlebot3_waffle'
+            robot_name = 'waffle'
             robot_sdf = os.path.join(this_package_dir, 'waffle_noiseless.model')
             with open(urdf, 'r') as urdf_file:
                 robot_description = urdf_file.read()

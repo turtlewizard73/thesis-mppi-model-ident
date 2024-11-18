@@ -29,7 +29,7 @@ def test_default_benchmark():
     assert controller_benchmark.update_parameters(default_mppi_params)
 
     # init turtlebot map
-    assert controller_benchmark.update_map('turtlebot3', True)
+    assert controller_benchmark.update_map('complex_ref', True)
 
     # launch nodes
     controller_benchmark.launch_nodes()
