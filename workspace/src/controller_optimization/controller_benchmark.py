@@ -39,6 +39,9 @@ from utils.parameter_manager import ParameterManager
 
 BASE_PATH = constants.BASE_PATH
 REPO_PATH = constants.REPO_PATH
+LAUNCH_PATH = constants.LAUNCH_PATH
+
+TIMESTAMP_FORMAT = constants.TIMESTAMP_FORMAT
 
 
 @dataclass
@@ -58,21 +61,15 @@ class ControllerBenchmark:
     def __init__(
             self, logger,
             config_path: str,
-            result_save_path: str = constants.RESULTS_PATH,
-            metric_save_path: str = constants.METRICS_PATH) -> None:
+            save_path: str = BASE_PATH) -> None:
         self.logger = logger
         self.nodes_active = False
 
-        if os.path.isdir(result_save_path) is False:
-            os.makedirs(result_save_path)
-        self.result_save_path = result_save_path
-
-        if os.path.isdir(metric_save_path) is False:
-            os.makedirs(metric_save_path)
-        self.metric_save_path = metric_save_path
-
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
+
+        self.result_save_path = os.path.join(save_path, 'results')
+        self.metric_save_path = os.path.join(save_path, 'metrics')
 
         self.config_path = config_path
         self.params: Dict = {}
@@ -87,7 +84,6 @@ class ControllerBenchmark:
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
 
-        self.update_map(self.params['reference_map'])
         self.launch_nodes()
 
         self.results: List[ControllerResult] = []
@@ -96,6 +92,14 @@ class ControllerBenchmark:
         self.logger.info('Destructor called.')
         if self.nodes_active is True:
             self.stop_nodes()
+            time.sleep(2)  # wait for nodes to stop
+
+    def setup_directories(self):
+        if os.path.isdir(self.result_save_path) is False:
+            os.makedirs(self.result_save_path)
+
+        if os.path.isdir(self.metric_save_path) is False:
+            os.makedirs(self.metric_save_path)
 
     @timing_decorator(
         lambda self: self.logger.info('Loading config...'),
@@ -108,7 +112,6 @@ class ControllerBenchmark:
             data = yaml.safe_load(file)
             self.logger.debug(f'Config: \n {pformat(data)}')
 
-            self.params['timestamp_format'] = data['timestamp_format']
             self.params['robot_name'] = data['robot_name']
             self.params['planner'] = data['planner']
             self.params['controller'] = data['controller']
@@ -134,10 +137,15 @@ class ControllerBenchmark:
                 yaw = data.get(map_name)['goal_pose']['yaw']
                 goal.pose.orientation = yaw2quat(yaw)
 
+                yaml_path = os.path.join(BASE_PATH, data.get(map_name)['path'])
+                if not os.path.isfile(yaml_path):
+                    yaml_path = os.path.join(LAUNCH_PATH, data.get(map_name)['path'])
+                    if not os.path.isfile(yaml_path):
+                        raise FileNotFoundError(f'Invalid path to map file: {yaml_path}')
+
                 mapdata = MapData(
                     name=map_name,
-                    yaml_path=os.path.join(
-                        BASE_PATH, data.get(map_name)['path']),
+                    yaml_path=yaml_path,  # abs path to map yaml
                     start=start,
                     goal=goal)
 
@@ -148,9 +156,7 @@ class ControllerBenchmark:
                 else:
                     mapdata.yaml_path_local = mapdata.yaml_path
 
-                map_config_path = os.path.join(
-                    BASE_PATH, mapdata.yaml_path)
-                with open(map_config_path, 'r', encoding='utf-8') as file:
+                with open(yaml_path, 'r', encoding='utf-8') as file:
                     map_config = yaml.safe_load(file)
                     mapdata.resolution = map_config['resolution']
                     mapdata.origin = np.array(
@@ -232,7 +238,7 @@ class ControllerBenchmark:
         self.nav.info('Change local map request was successful!')
         return True
 
-    def update_map(self, mapname: str) -> bool:
+    def update_map(self, mapname: str, skip_local=False) -> bool:
         mapdata = self.mapdata_dict[mapname]
 
         self.logger.info(f'Changing global map to: {mapdata.yaml_path}')
@@ -241,12 +247,13 @@ class ControllerBenchmark:
             self.logger.error('Failed to change global map')
             return False
 
-        local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
-        self.logger.info(f'Changing local map to: {local_map_path}')
-        res = self.changeLocalMap(local_map_path)
-        if res is False:
-            self.logger.error('Failed to change local map')
-            return False
+        if skip_local is False:
+            local_map_path = mapdata.yaml_path_local if mapdata.yaml_path_local != '' else mapdata.yaml_path
+            self.logger.info(f'Changing local map to: {local_map_path}')
+            res = self.changeLocalMap(local_map_path)
+            if res is False:
+                self.logger.error('Failed to change local map')
+                return False
 
         self.current_mapdata = mapdata
         self.nav.clearAllCostmaps()
@@ -295,7 +302,7 @@ class ControllerBenchmark:
             self.nodes_active = True
 
         except Exception as e:
-            raise RuntimeError(f'Failed to launch nodes: {e}')
+            raise RuntimeError(f'Failed to launch nodes: {e}') from e
 
     def _spin_executor(self, executor):
         try:
@@ -330,7 +337,7 @@ class ControllerBenchmark:
             self.nodes_active = False
 
         except Exception as e:
-            raise RuntimeError(f'Failed to stop nodes: {e}')
+            raise RuntimeError(f'Failed to stop nodes: {e}') from e
 
     @timing_decorator(
         lambda self: self.logger.info('Checking if nodes are active...'),
@@ -490,6 +497,25 @@ class ControllerBenchmark:
             self.logger.error('Failed to run benchmark: %s', msg)
             return result
 
+        # add everything calculated outside to result
+        result.time_elapsed = time_elapsed
+        result.success = True
+        result.status_msg = 'Success'
+        result.path_xy = path_xy
+        result.path_omega = path_omega
+        self.get_result(result, start_time, end_time)
+
+        if store_result is True:
+            self.results.append(result)
+
+        return result
+
+    def get_result(
+            self,
+            result: ControllerResult,
+            start_time: rclpy.clock.Time,
+            end_time: rclpy.clock.Time) -> None:
+
         odom_xy, odom_omega, odom_t = self.odom_sub.get_data_between(
             start_time.nanoseconds, end_time.nanoseconds)
         cmd_vel_xy, cmd_vel_omega, cmd_vel_t = self.cmd_vel_sub.get_data_between(
@@ -501,24 +527,25 @@ class ControllerBenchmark:
         costmap_msg: Costmap = self.nav.getLocalCostmap()
         size_x = costmap_msg.metadata.size_x
         size_y = costmap_msg.metadata.size_y
-        costmap_array = np.array(costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
+        costmap_array = np.array(
+            costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
         costmap_array = np.flip(costmap_array, 0)
 
         map_resolution = costmap_msg.metadata.resolution
         origin_x = costmap_msg.metadata.origin.position.x
         origin_y = costmap_msg.metadata.origin.position.y
         path_costs = []
-        for x, y in path_xy:
+        for x, y in result.path_xy:
             x_idx = int((x - origin_x) / map_resolution)
             y_idx = int((y - origin_y) / map_resolution)
             path_costs.append(costmap_msg.data[y_idx * size_x + x_idx])
 
         result.start_time = start_time.nanoseconds * 1e-9
-        result.time_elapsed = time_elapsed
-        result.success = True
-        result.status_msg = 'Success'
-        result.path_xy = path_xy
-        result.path_omega = path_omega
+        # result.time_elapsed = time_elapsed
+        # result.success = True
+        # result.status_msg = 'Success'
+        # result.path_xy = path_xy
+        # result.path_omega = path_omega
         result.odom_xy = odom_xy
         result.odom_omega = odom_omega
         result.odom_t = odom_t
@@ -530,23 +557,7 @@ class ControllerBenchmark:
         result.costmap = costmap_array
         result.path_costs = np.array(path_costs)
 
-        if store_result is True:
-            self.results.append(result)
-
         return result
-
-    @timing_decorator(
-        lambda self: self.logger.info('Running batch...'),
-        lambda self, ex_time: self.logger.info(f'Batch finished in {ex_time:.4f} seconds.'))
-    def run_batch(self, parameters: list[dict]) -> list[dict[int, bool]]:
-        # make a list to store if the benchmark was successful
-        results: list[dict[int, bool]] = []
-
-        for i, params in enumerate(parameters):
-            success = self.run_benchmark(parameters=params, store_results=True)
-            results.append({i: success})
-
-        return results
 
     @timing_decorator(
         lambda self: self.logger.info('Calculating metric...'),
@@ -571,10 +582,13 @@ class ControllerBenchmark:
 
             time_elapsed=result.time_elapsed,
             success=result.success,
+            status_msg=result.status_msg,
+            path_xy=result.path_xy,
+            odom_xy=result.odom_xy,
+            cmd_vel_t=result.cmd_vel_t,
+
             distance_to_goal=distance_to_goal,
             angle_to_goal=angle_to_goal / np.pi * 180,  # rad to deg
-
-            path_xy=result.path_xy,
 
             linear_velocity=result.cmd_vel_xy[:, 0],
             avg_linear_velocity=np.mean(result.cmd_vel_xy[:, 0]),
@@ -604,13 +618,15 @@ class ControllerBenchmark:
             self, result: ControllerResult,
             output_dir: str = '', uid: str = '') -> str:
         self.logger.info(f'Saving result: {result.map_name}.')
+        self.setup_directories()
+
         output_dir = output_dir if output_dir != '' else \
             self.result_save_path
 
         if os.path.isdir(output_dir) is False:
             os.makedirs(output_dir)
 
-        uid = uid if uid != '' else time.strftime(self.params['timestamp_format'])
+        uid = uid if uid != '' else time.strftime(TIMESTAMP_FORMAT)
         filename = f'result_{uid}.pickle'
 
         save_path = os.path.join(output_dir, filename)
@@ -656,12 +672,14 @@ class ControllerBenchmark:
             self, metric: ControllerMetric,
             output_dir: str = '', uid: str = '') -> str:
         self.logger.info(f'Saving result: {metric.map_name}.')
+        self.setup_directories()
+
         output_dir = output_dir if output_dir != '' else self.metric_save_path
 
         if os.path.isdir(output_dir) is False:
             os.makedirs(output_dir)
 
-        uid = uid if uid != '' else time.strftime(self.params['timestamp_format'])
+        uid = uid if uid != '' else time.strftime(TIMESTAMP_FORMAT)
         filename = f'result_{uid}.pickle'
 
         save_path = os.path.join(output_dir, filename)
@@ -734,7 +752,8 @@ class ControllerBenchmark:
             map_img, cmap='gray', aspect='auto',
             interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
 
-        ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label='Plan', color='g')
+        if result.path_xy.shape[0] > 0:
+            ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label='Plan', color='g')
         ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label='Route', color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
@@ -762,8 +781,7 @@ class ControllerBenchmark:
 
         return fig
 
-    def plot_metric(
-            self, result: ControllerResult, metric: ControllerMetric) -> Figure:
+    def plot_metric(self, metric: ControllerMetric) -> Figure:
         self.logger.info('Generating metric plot.')
 
         # plot1: same as result plot
@@ -793,16 +811,17 @@ class ControllerBenchmark:
             interpolation='none', extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])
 
         plan_label = f'Plan - dist: {metric.distance_to_goal:.2f} [m]'
-        ax_plan.plot(result.path_xy[:, 0], result.path_xy[:, 1], label=plan_label, color='g')
+        if metric.path_xy.shape[0] > 0:
+            ax_plan.plot(metric.path_xy[:, 0], metric.path_xy[:, 1], label=plan_label, color='g')
         time_s = metric.time_elapsed
         route_label = f'Route - time: {time_s:.2f} [s]'
-        ax_plan.plot(result.odom_xy[:, 0], result.odom_xy[:, 1], label=route_label, color='r')
+        ax_plan.plot(metric.odom_xy[:, 0], metric.odom_xy[:, 1], label=route_label, color='r')
         ax_plan.grid(visible=True, which='both', axis='both')
         ax_plan.legend()
 
         # jerk graph
         # ax_jerk.set_title('Jerk')
-        cmd_vel_t_s = result.cmd_vel_t
+        cmd_vel_t_s = metric.cmd_vel_t
         ax_jerk.set_xlabel('Time [s]')
         ax_jerk.set_ylabel('Jerk [m/s^3], [rad/s^3]')
         label = f'Linear jerk - RMS: {metric.rms_linear_jerk:.2f} [m/s^3]'
@@ -813,6 +832,8 @@ class ControllerBenchmark:
         ax_jerk.legend()
 
         # TODO: make nicer data vis
-        self.logger.info(metric.to_table_string())
 
         return fig
+
+    def get_timestamp(self) -> str:
+        return time.strftime(TIMESTAMP_FORMAT)

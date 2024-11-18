@@ -132,7 +132,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
                 '-file', robot_sdf,
                 # '-topic', 'robot_description',
                 '-timeout', '60',
-                '-robot_namespace', namespace,
+                '-robot_namespace', '',
                 '-x', pose['x'], '-y', pose['y'], '-z', pose['z'],
                 '-R', pose['R'], '-P', pose['P'], '-Y', pose['Y']],
             condition=IfCondition(str(robot_type.perform(context) != 'enjoy'))),

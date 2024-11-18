@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
 import os
-import numpy as np
 import time
 import matplotlib.pyplot as plt
 
@@ -14,6 +13,40 @@ from utils.controller_parameters import ControllerParameters
 BASE_PATH = constants.BASE_PATH
 LAUNCH_PATH = constants.LAUNCH_PATH
 global logger, controller_benchmark
+
+
+def test_default_benchmark():
+    # map: turtlebot map
+    # params: default nav2 for waffle params
+    global logger
+    logger.info("Running default benchmark")
+
+    # init default parameters
+    default_mppi_params = ControllerParameters()
+    default_mppi_params.load_from_yaml(
+        os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
+    assert controller_benchmark.update_parameters(default_mppi_params)
+
+    # init turtlebot map
+    assert controller_benchmark.update_map('complex_ref', True)
+
+    # launch nodes
+    controller_benchmark.launch_nodes()
+
+    # run benchmark
+    result: ControllerResult = controller_benchmark.run_benchmark(
+        run_uid='turtlebot_map_waffle_0')
+    controller_benchmark.stop_nodes()
+    assert result.success
+
+    controller_benchmark.save_result(result)
+    fig_result = controller_benchmark.plot_result(result)
+
+    metric = controller_benchmark.calculate_metric(result)
+    controller_benchmark.save_metric(metric)
+    fig_metric = controller_benchmark.plot_metric(result, metric)
+
+    plt.show(block=False)
 
 
 def test_benchmark():
@@ -48,15 +81,6 @@ def test_benchmark():
 
     plt.show(block=False)
 
-    # Wait for the 'q' key press
-    while True:
-        key = input("Press 'q' to quit: ").strip().lower()
-        if key == 'q':
-            break
-
-    # Close all figures
-    plt.close('all')
-
 
 def plot_last():
     # read last metric and result
@@ -73,19 +97,31 @@ def plot_last():
 def main():
     global logger, controller_benchmark
     logger = setup_run(
-        logger_name='ControllerBenchmark',
+        logger_name='Run',
         log_file_path=os.path.join(BASE_PATH, 'logs')
     )
 
     controller_benchmark = ControllerBenchmark(
-        logger=logger,
+        logger=logger.getChild('ControllerBenchmark'),
         config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'))
 
     try:
-        test_benchmark()
+        test_default_benchmark()
+
+        # Wait for the 'q' key press
+        while True:
+            key = input("Press 'q' to quit: ").strip().lower()
+            if key == 'q':
+                break
+
+        # Close all figures
+        plt.close('all')
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt, stopping nodes.")
+    except Exception as e:
+        logger.error(f"Exception: {e}")
 
+    del controller_benchmark
     time.sleep(1)
     exit(0)
 

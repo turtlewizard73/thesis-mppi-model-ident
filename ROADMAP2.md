@@ -97,3 +97,21 @@ output2: sum of costs on the path
 - több robot lespawnolása működik külön ugye
   - service robot át lett alakítvav (szenzorok kiszedve inercia a lényeg)
   - plus joint state pub megoldodda hogy kerekek nem voltak tf részei
+  - base link elé bekerült base footprint a service robotnál
+
+## 2024. 11. 13.
+- gazebo worldbe kell
+- "<plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so" >"
+  - hogy legyen spawn entity state service
+
+
+## 2024. 11. 16.
+Benchmarks:
+1. How does the metrics change, what is their distribution?
+   - parameters: defaults
+   - 10 run
+   - waffle, burger, service robot
+2. How each critic affects the metrics?
+   - parameters: defaults + 1 critic 1-100
+   - 100 run (1,2,3....100) times 8 -> 800?
+   - waffle, service robot

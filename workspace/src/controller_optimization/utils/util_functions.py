@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 # Common modules
+import csv
 import os
 import argparse
 import logging
@@ -17,12 +18,15 @@ from geometry_msgs.msg import Quaternion
 
 
 def setup_run(
+        parser: argparse.ArgumentParser = None,
         logger_name: str = 'ControllerBenchmark',
         log_file_path: str = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/logs') -> logging.Logger:
-    parser = argparse.ArgumentParser(description='Run controller benchmark.')
+    parser = parser if parser is not None else argparse.ArgumentParser('Setup run script.')
     parser.add_argument(
         '-d', '--debug', action='store_true', default=False,
         help='Run in debug mode.')
+    parser.add_argument(
+        '-t', '--trial', type=str, default='test_trial',)
     args = parser.parse_args()
 
     # LOGGING
@@ -114,6 +118,17 @@ def reformat_yaml(input_path: str, output_path: str):
 
     with open(output_path, 'w', encoding='utf-8') as file:
         file.write(yaml.dump(flat_data, default_flow_style=None))
+
+
+def numpy_dict_to_list(d: dict) -> dict:
+    for key, value in d.items():
+        if isinstance(value, dict):
+            d[key] = numpy_dict_to_list(value)
+        elif isinstance(value, np.ndarray):
+            d[key] = value.tolist()
+        elif isinstance(value, np.float64):
+            d[key] = float(value)
+    return d
 
 
 def yaw2quat(yaw: float) -> Quaternion:
