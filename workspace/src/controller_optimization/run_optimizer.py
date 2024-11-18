@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 import os
 import time
+import argparse
 
 import constants
 from controller_optimizer import ControllerOptimizer
@@ -11,19 +12,20 @@ LAUNCH_PATH = constants.LAUNCH_PATH
 OPTIMIZATION_OUTPUT_PATH = constants.OPTIMIZATION_OUTPUT_PATH
 
 
-def main():
-    NAME = 'test0'
+def get_trial_name():
+    return parser.parse_args().trial
 
-    logger = setup_run('optimizer', os.path.join(BASE_PATH, 'logs'))
-    stamp = time.strftime(constants.TIMESTAMP_FORMAT)
-    WORK_DIR = os.path.join(OPTIMIZATION_OUTPUT_PATH, f'{NAME}_{stamp}')
+
+def main():
+    parser = argparse.ArgumentParser(description='Setup controller optimizer.')
+    logger = setup_run(parser, 'Optimizer', os.path.join(BASE_PATH, 'logs'))
+    trial_name = parser.parse_args().trial
 
     optimizer = ControllerOptimizer(
         logger=logger,
-        config_path=os.path.join(BASE_PATH, 'config/controller_optimizer_config.yaml'),
-        work_dir=WORK_DIR)
+        config_path=os.path.join(BASE_PATH, 'config/controller_optimizer_config.yaml'))
 
-    optimizer.setup_run(trial_name='test_trial')
+    optimizer.setup_run(trial_name=trial_name)
 
     optimizer.run_reference()
     optimizer.run()

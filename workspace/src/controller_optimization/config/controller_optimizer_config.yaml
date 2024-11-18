@@ -6,7 +6,7 @@ trials:
   - waffle_random
   - waffle_grid
 test_trial:
-  map: complex_ref
+  map: complex_test
   robot: waffle
   generator: default
   score_method: default

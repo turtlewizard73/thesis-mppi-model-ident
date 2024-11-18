@@ -18,12 +18,15 @@ from geometry_msgs.msg import Quaternion
 
 
 def setup_run(
+        parser: argparse.ArgumentParser = None,
         logger_name: str = 'ControllerBenchmark',
         log_file_path: str = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/logs') -> logging.Logger:
-    parser = argparse.ArgumentParser(description='Run controller benchmark.')
+    parser = parser if parser is not None else argparse.ArgumentParser('Setup run script.')
     parser.add_argument(
         '-d', '--debug', action='store_true', default=False,
         help='Run in debug mode.')
+    parser.add_argument(
+        '-t', '--trial', type=str, default='test_trial',)
     args = parser.parse_args()
 
     # LOGGING

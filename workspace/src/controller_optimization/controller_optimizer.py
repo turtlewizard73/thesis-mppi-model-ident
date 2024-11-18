@@ -60,14 +60,9 @@ class ControllerOptimizer:
         self.work_dir = ''
         self.load_config()
 
-        self.output_csv_path = os.path.join(self.work_dir, 'run_results.csv')
-        self.output_final_csv_path = os.path.join(self.work_dir, 'final_results.csv')
-        self.output_yaml_path = os.path.join(self.work_dir, 'summary.yaml')
-
         self.cb = ControllerBenchmark(
             logger=logger.getChild('Benchmark'),
-            config_path=constants.DEFAULT_MPPI_PARAMS_PATH,
-            save_path=self.work_dir)
+            config_path=constants.DEFAULT_BENCHMARK_CONFIG)
         self.cb.launch_nodes()
 
         self.final_output_rows: List[Dict] = []
@@ -79,7 +74,6 @@ class ControllerOptimizer:
         # reference parameters
         # TODO: put these into config then into load_config()
         self.reference_score = 0.0
-        self.reference_map = 'complex_ref'
         self.reference_params = ControllerParameters()
         self.reference_params.load_from_yaml(constants.DEFAULT_MPPI_PARAMS_PATH)
         self.reference_metric = None
@@ -111,13 +105,25 @@ class ControllerOptimizer:
                 )
                 self.configured_trials.append(t)
 
-        self.work_dir = os.path.join(constants.OPTIMIZATION_OUTPUT_PATH, self.params['name'])
-        if not os.path.exists(self.work_dir):
-            os.makedirs(self.work_dir)
-
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Params: \n {pformat(self.params)}')
             self.logger.debug(f'Config: \n {pformat(self.configured_trials)}')
+
+    def setup_work_dir(self):
+        stamp = time.strftime(constants.TIMESTAMP_FORMAT)
+        folder_name = f"{self.current_trial['name']}_{stamp}"
+        self.work_dir = os.path.join(
+            constants.OPTIMIZATION_OUTPUT_PATH, folder_name)
+        if not os.path.exists(self.work_dir):
+            os.makedirs(self.work_dir)
+
+        self.output_csv_path = os.path.join(self.work_dir, 'run_results.csv')
+        self.output_final_csv_path = os.path.join(self.work_dir, 'final_results.csv')
+        self.output_yaml_path = os.path.join(self.work_dir, 'summary.yaml')
+
+        self.cb.result_save_path = os.path.join(self.work_dir, 'results')
+        self.cb.metric_save_path = os.path.join(self.work_dir, 'metrics')
+        self.cb.setup_directories()
 
     def setup_run(
             self, trial_name: str, timeout: float = 0.0,
@@ -157,6 +163,9 @@ class ControllerOptimizer:
             self.score_method = score_method
 
         self.current_trial = trial
+
+        # setup work directory
+        self.setup_work_dir()
 
         self.logger.info(f"Setup complete for trial: {trial_name}")
 
@@ -247,7 +256,7 @@ class ControllerOptimizer:
         self.logger.info("Running reference benchmark")
 
         self.cb.update_parameters(self.reference_params)
-        self.cb.update_map(self.reference_map)
+        self.cb.update_map(self.current_trial['map'])
 
         # 120 seconds timeout should be enough for the reference run
         result = self.cb.run_benchmark(run_uid='reference', timeout=120)
@@ -291,6 +300,9 @@ class ControllerOptimizer:
         if self.score_method is None:
             raise ValueError("Score method not set.")
 
+        if self.work_dir == '':
+            raise ValueError("Work directory not set.")
+
         trial_name = self.current_trial['name']
         self.logger.info(f'Updating map: {self.current_trial["map"]}')
         self.cb.update_map(self.current_trial['map'])
@@ -313,6 +325,8 @@ class ControllerOptimizer:
                 if run_result['success'] is False:
                     self.logger.warn(f"Failed to run trial {i}")
                     continue
+
+                successful_trials += 1
 
                 score = run_result['score']
                 self.logger.info(f"Trial {i} finished with score: {score}")
