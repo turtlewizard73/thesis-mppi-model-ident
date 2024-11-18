@@ -44,7 +44,7 @@ def test_default_benchmark():
 
     metric = controller_benchmark.calculate_metric(result)
     controller_benchmark.save_metric(metric)
-    fig_metric = controller_benchmark.plot_metric(result, metric)
+    fig_metric = controller_benchmark.plot_metric(metric)
 
     plt.show(block=False)
 
@@ -77,7 +77,7 @@ def test_benchmark():
     metric = controller_benchmark.calculate_metric(result)
     controller_benchmark.save_metric(metric)
 
-    fig_metric = controller_benchmark.plot_metric(result, metric)
+    fig_metric = controller_benchmark.plot_metric(metric)
 
     plt.show(block=False)
 
@@ -89,7 +89,7 @@ def plot_last():
     metric = controller_benchmark.load_last_metric()
 
     fig_result = controller_benchmark.plot_result(result)
-    fig_metric = controller_benchmark.plot_metric(result, metric)
+    fig_metric = controller_benchmark.plot_metric(metric)
 
     plt.show()
 

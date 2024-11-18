@@ -365,3 +365,4 @@ class ControllerOptimizer:
                 yaml.dump(
                     {**self.current_trial, **run_summary},
                     file, default_flow_style=False, sort_keys=False)
+            self.cb.stop_nodes()

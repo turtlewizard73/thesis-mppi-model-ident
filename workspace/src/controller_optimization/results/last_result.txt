@@ -1,1 +1,0 @@
-/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/results/result_2024-11-13-22-13.pickle

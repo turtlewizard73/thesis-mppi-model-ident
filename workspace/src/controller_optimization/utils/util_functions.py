@@ -7,7 +7,6 @@ import argparse
 import logging
 from time import strftime
 import time
-# import yaml
 import yaml
 import numpy as np
 from functools import wraps

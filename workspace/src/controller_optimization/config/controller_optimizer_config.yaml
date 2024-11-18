@@ -1,5 +1,6 @@
 trials:
   - test_trial
+  - test_random
   - default_distribution
   - enjoy_distribution
   - burger_distribution
@@ -9,6 +10,13 @@ test_trial:
   map: complex_test
   robot: waffle
   generator: default
+  score_method: default
+  runs: 2
+  run_timeout: 60
+test_random:
+  map: complex_test
+  robot: waffle
+  generator: random
   score_method: default
   runs: 2
   run_timeout: 60

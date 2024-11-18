@@ -12,10 +12,6 @@ LAUNCH_PATH = constants.LAUNCH_PATH
 OPTIMIZATION_OUTPUT_PATH = constants.OPTIMIZATION_OUTPUT_PATH
 
 
-def get_trial_name():
-    return parser.parse_args().trial
-
-
 def main():
     parser = argparse.ArgumentParser(description='Setup controller optimizer.')
     logger = setup_run(parser, 'Optimizer', os.path.join(BASE_PATH, 'logs'))
@@ -30,8 +26,9 @@ def main():
     optimizer.run_reference()
     optimizer.run()
 
-    time.sleep(5)
+    del optimizer
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    exit(main())

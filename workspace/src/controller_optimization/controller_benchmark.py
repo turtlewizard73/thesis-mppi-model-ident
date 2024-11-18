@@ -92,7 +92,6 @@ class ControllerBenchmark:
         self.logger.info('Destructor called.')
         if self.nodes_active is True:
             self.stop_nodes()
-            time.sleep(2)  # wait for nodes to stop
 
     def setup_directories(self):
         if os.path.isdir(self.result_save_path) is False:
@@ -309,6 +308,8 @@ class ControllerBenchmark:
             executor.spin()
         except rclpy.executors.ExternalShutdownException:
             self.logger.warn('Executor failed to spin')
+        except Exception as e:
+            self.logger.error(f'Executor error: {e}')
 
     def _start_data_collection(self):
         for name, node in self.nodes.items():
@@ -328,11 +329,22 @@ class ControllerBenchmark:
             for node in self.nodes.values():
                 node.destroy_node()
 
+            time.sleep(1)
+            self.logger.debug('Stopped nodes.')
+
             for sub_executor in self.executors.values():
                 sub_executor.shutdown()
 
+            time.sleep(1)
+            self.logger.debug('Stopped sub executors.')
+
             for sub_thread in self.executor_threads.values():
                 sub_thread.join()
+
+            time.sleep(1)
+            self.logger.debug('Stopped sub threads.')
+
+            time.sleep(5)  # wait for nodes to stop
 
             self.nodes_active = False
 
@@ -421,6 +433,7 @@ class ControllerBenchmark:
         # TODO: check if successful (not really priority)
         self.logger.info('Resetting world and setting robot pose.')
         self.gazebo_interface.reset_world()
+        # TODO: this is actually doing nothing because robot name is not updated
         self.gazebo_interface.set_entity_state(self.params['robot_name'], start.pose)
         self.nav.setInitialPose(start)
         self.nav.clearAllCostmaps()
