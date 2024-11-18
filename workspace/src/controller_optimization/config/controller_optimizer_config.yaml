@@ -53,5 +53,12 @@ waffle_grid:
   robot: waffle
   generator: grid
   score_method: default
-  runs: 0
+  runs: 808
+  run_timeout: 60
+enjoy_distribution_enjoy_params:
+  map: complex_ref
+  robot: enjoy
+  generator: default
+  score_method: default
+  runs: 100
   run_timeout: 60

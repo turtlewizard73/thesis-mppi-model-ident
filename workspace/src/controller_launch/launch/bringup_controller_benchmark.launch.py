@@ -23,13 +23,19 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
 
     gui = LaunchConfiguration('gui')
     robot_type = LaunchConfiguration('rt')
+    nav2_params_type = LaunchConfiguration('p')
 
     rviz_config_file = os.path.join(this_package_dir, 'rviz_default_view.rviz')
     global_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
     local_map_file = os.path.join(this_package_dir, 'empty_map.yaml')
 
-    nav_config = os.path.join(this_package_dir, 'nav2_params_benchmark.yaml')
-    # nav_config = os.path.join(this_package_dir, 'default_nav2_params.yaml')
+    match nav2_params_type.perform(context=context):
+        case 'default':
+            nav_config_name = 'nav2_params_benchmark.yaml'
+        case 'enjoy':
+            nav_config_name = 'nav2_params_benchmark_enjoy.yaml'
+
+    nav_config = os.path.join(this_package_dir, nav_config_name)
 
     lifecycle_nodes = [
         'map_server', 'local_map_server', 'planner_server', 'controller_server']
@@ -215,6 +221,11 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'rt', default_value='waffle',
             description='Robot type: waffle, burger, or enjoy.'
+        ),
+
+        DeclareLaunchArgument(
+            'p', default_value='default',
+            description='Nav2 parameters to use.'
         ),
     ]
 

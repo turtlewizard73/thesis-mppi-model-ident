@@ -4,8 +4,7 @@ from pprint import pformat
 import yaml
 import time
 from typing import List, Dict, TypedDict, Callable
-from enum import Enum, auto
-from dataclasses import dataclass
+from enum import Enum
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -185,11 +184,13 @@ class ControllerOptimizer:
             self.cb.update_parameters(self.test_params)
             yield i
 
-    def generator_grid(self, n: int):
+    def generator_grid(self):
+        n = 101
+        scale = 1
         # generate grid and update the controller benchmark
         i = 1
         for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
-            grid_space = np.arange(0, 101, 1)
+            grid_space = np.arange(0, n, scale)
             for v in grid_space:
                 self.test_params.set_critic_weight(critic, v)
                 yield i
@@ -313,23 +314,22 @@ class ControllerOptimizer:
         best_params: ControllerParameters = deepcopy(self.test_params)
         best_metric_path = 'None'
 
-        num_trials = 0
+        num_trials = self.current_trial['runs']
         successful_trials = 0
         loop_start_time = time.time()
         try:
             for i in self.generator():
-                self.logger.info(f"Running trial {trial_name}: {i}")
+                self.logger.info(f"Running trial {trial_name}: {i}/{num_trials}")
 
-                num_trials += 1
                 run_result: RunResult = self._run(i)
                 if run_result['success'] is False:
-                    self.logger.warn(f"Failed to run trial {i}")
+                    self.logger.warn(f"Failed to run trial {i}/{num_trials}")
                     continue
 
                 successful_trials += 1
 
                 score = run_result['score']
-                self.logger.info(f"Trial {i} finished with score: {score}")
+                self.logger.info(f"Trial {i}/{num_trials} finished with score: {score}")
                 if run_result['score'] < best_score:
                     best_score = score
                     best_params = deepcopy(self.test_params)

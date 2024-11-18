@@ -9,7 +9,7 @@ controller_server:
     failure_tolerance: 0.3
     progress_checker_plugin: "progress_checker"
     goal_checker_plugins: ["general_goal_checker"] # "precise_goal_checker"
-    controller_plugins: ["FollowPathMPPI"]
+    controller_plugins: ["FollowPath"]
 
     # Progress checker parameters
     progress_checker:
@@ -27,7 +27,7 @@ controller_server:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
-    FollowPathMPPI:
+    FollowPath:
       plugin: "nav2_mppi_controller::MPPIController"
       publish_critics: true  # custom parameter from forked nav2_mppi_controller
       time_steps: 56

@@ -27,11 +27,16 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
     use_sim_time = 'true'
     autostart = 'true'
     use_respawn = 'False'
+    nav2_params_type = LaunchConfiguration('p')
+    loc_params_file = os.path.join(this_package_dir, 'nav2_params_full_default.yaml')
+    nav2_params_file = os.path.join(this_package_dir, 'nav2_params_full_default.yaml')
+    if nav2_params_type.perform(context=context) == 'enjoy':
+        nav2_params_file = os.path.join(this_package_dir, 'nav2_params_full_enjoy.yaml')
 
     rviz_config_file = os.path.join(this_package_dir, 'rviz_default_view.rviz')
     map_yaml_file = os.path.join(this_package_dir, 'turtlebot3_world.yaml')
     world = os.path.join(this_package_dir, 'world_only.world')
-    nav2_params_file = os.path.join(this_package_dir, 'nav2_params_default.yaml')
+
     param_substitutions = {
         'use_sim_time': use_sim_time,
         'yaml_filename': map_yaml_file}
@@ -178,7 +183,7 @@ def launch_setup(context: LaunchContext, *args, **kwargs) -> list:
                 'map': map_yaml_file,
                 'use_sim_time': use_sim_time,
                 'autostart': autostart,
-                'params_file': nav2_params_file,
+                'params_file': loc_params_file,
                 'use_composition': use_composition,
                 'use_respawn': use_respawn,
                 'container_name': 'nav2_container'}.items()),
@@ -209,6 +214,11 @@ def generate_launch_description() -> LaunchDescription:
         DeclareLaunchArgument(
             'rt', default_value='waffle',
             description='Robot type: waffle, burger, or enjoy.'
+        ),
+
+        DeclareLaunchArgument(
+            'p', default_value='default',
+            description='Nav2 parameters to use.'
         ),
     ]
 
