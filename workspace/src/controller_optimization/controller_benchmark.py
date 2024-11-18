@@ -41,6 +41,8 @@ BASE_PATH = constants.BASE_PATH
 REPO_PATH = constants.REPO_PATH
 LAUNCH_PATH = constants.LAUNCH_PATH
 
+TIMESTAMP_FORMAT = constants.TIMESTAMP_FORMAT
+
 
 @dataclass
 class MapData:
@@ -63,11 +65,11 @@ class ControllerBenchmark:
         self.logger = logger
         self.nodes_active = False
 
-        self.result_save_path = os.path.join(save_path, 'results')
-        self.metric_save_path = os.path.join(save_path, 'metrics')
-
         if os.path.isfile(config_path) is False:
             raise ValueError(f'Invalid path to config file: {config_path}')
+
+        self.result_save_path = os.path.join(save_path, 'results')
+        self.metric_save_path = os.path.join(save_path, 'metrics')
 
         self.config_path = config_path
         self.params: Dict = {}
@@ -90,6 +92,7 @@ class ControllerBenchmark:
         self.logger.info('Destructor called.')
         if self.nodes_active is True:
             self.stop_nodes()
+            time.sleep(2)  # wait for nodes to stop
 
     def setup_directories(self):
         if os.path.isdir(self.result_save_path) is False:
@@ -109,7 +112,6 @@ class ControllerBenchmark:
             data = yaml.safe_load(file)
             self.logger.debug(f'Config: \n {pformat(data)}')
 
-            self.params['timestamp_format'] = data['timestamp_format']
             self.params['robot_name'] = data['robot_name']
             self.params['planner'] = data['planner']
             self.params['controller'] = data['controller']
@@ -624,7 +626,7 @@ class ControllerBenchmark:
         if os.path.isdir(output_dir) is False:
             os.makedirs(output_dir)
 
-        uid = uid if uid != '' else time.strftime(self.params['timestamp_format'])
+        uid = uid if uid != '' else time.strftime(TIMESTAMP_FORMAT)
         filename = f'result_{uid}.pickle'
 
         save_path = os.path.join(output_dir, filename)
@@ -677,7 +679,7 @@ class ControllerBenchmark:
         if os.path.isdir(output_dir) is False:
             os.makedirs(output_dir)
 
-        uid = uid if uid != '' else time.strftime(self.params['timestamp_format'])
+        uid = uid if uid != '' else time.strftime(TIMESTAMP_FORMAT)
         filename = f'result_{uid}.pickle'
 
         save_path = os.path.join(output_dir, filename)
@@ -834,4 +836,4 @@ class ControllerBenchmark:
         return fig
 
     def get_timestamp(self) -> str:
-        return time.strftime(self.params['timestamp_format'])
+        return time.strftime(TIMESTAMP_FORMAT)

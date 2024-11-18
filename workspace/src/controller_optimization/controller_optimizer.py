@@ -52,25 +52,22 @@ class RunResult(TypedDict):
 
 
 class ControllerOptimizer:
-    def __init__(
-            self, logger,
-            controller_benchmark: ControllerBenchmark,
-            config_path: str, work_dir: str = ''):
+    def __init__(self, logger, config_path: str):
         self.logger = logger
         self.config_path = config_path
         self.params: Dict = {}
         self.configured_trials: List[Trial] = []
-        self.work_dir = work_dir if work_dir != '' else os.path.join(
-            constants.OPTIMIZATION_OUTPUT_PATH, 'optimization_output')
-        if not os.path.exists(self.work_dir):
-            os.makedirs(self.work_dir)
+        self.work_dir = ''
         self.load_config()
 
         self.output_csv_path = os.path.join(self.work_dir, 'run_results.csv')
         self.output_final_csv_path = os.path.join(self.work_dir, 'final_results.csv')
         self.output_yaml_path = os.path.join(self.work_dir, 'summary.yaml')
 
-        self.cb = controller_benchmark
+        self.cb = ControllerBenchmark(
+            logger=logger.getChild('Benchmark'),
+            config_path=constants.DEFAULT_MPPI_PARAMS_PATH,
+            save_path=self.work_dir)
         self.cb.launch_nodes()
 
         self.final_output_rows: List[Dict] = []
@@ -113,6 +110,10 @@ class ControllerOptimizer:
                     run_timeout=data[t]['run_timeout']
                 )
                 self.configured_trials.append(t)
+
+        self.work_dir = os.path.join(constants.OPTIMIZATION_OUTPUT_PATH, self.params['name'])
+        if not os.path.exists(self.work_dir):
+            os.makedirs(self.work_dir)
 
         if self.logger.isEnabledFor(logging.DEBUG):
             self.logger.debug(f'Params: \n {pformat(self.params)}')
