@@ -32,14 +32,14 @@ enjoy_distribution:
   robot: enjoy
   generator: default
   score_method: default
-  runs: 20
+  runs: 100
   run_timeout: 60
 burger_distribution:
   map: complex_ref
   robot: burger
   generator: default
   score_method: default
-  runs: 20
+  runs: 100
   run_timeout: 60
 waffle_random:
   map: complex_ref
