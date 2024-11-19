@@ -19,6 +19,7 @@ class ControllerMetric:
     odom_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
     cmd_vel_t: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
 
+    frechet_distance: float = 0.0  # [m] Frechet distance between path and goal
     distance_to_goal: float = 0.0  # [m] stopping distance from the goal
     angle_to_goal: float = 0.0  # [rad] stopping angle difference from the goal
 

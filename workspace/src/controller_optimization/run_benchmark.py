@@ -22,26 +22,30 @@ def test_default_benchmark():
     logger.info("Running default benchmark")
 
     # init default parameters
+    logger.info("Loading default parameters")
     default_mppi_params = ControllerParameters()
-    default_mppi_params.load_from_yaml(
-        os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
+    default_mppi_params.load_from_yaml(constants.DEFAULT_MPPI_PARAMS_PATH)
     assert controller_benchmark.update_parameters(default_mppi_params)
 
     # init turtlebot map
-    assert controller_benchmark.update_map('complex_ref', True)
+    logger.info("Loading map")
+    assert controller_benchmark.update_map('turtlebot3', True)
 
     # launch nodes
     controller_benchmark.launch_nodes()
 
     # run benchmark
+    logger.info("Running benchmark")
     result: ControllerResult = controller_benchmark.run_benchmark(
         run_uid='turtlebot_map_waffle_0')
     controller_benchmark.stop_nodes()
     assert result.success
 
+    logger.info('Saving results')
     controller_benchmark.save_result(result)
     fig_result = controller_benchmark.plot_result(result)
 
+    logger.info('Calculating metric')
     metric = controller_benchmark.calculate_metric(result)
     controller_benchmark.save_metric(metric)
     fig_metric = controller_benchmark.plot_metric(metric)
@@ -54,8 +58,7 @@ def test_benchmark():
 
     # init default parameters
     default_mppi_params = ControllerParameters()
-    default_mppi_params.load_from_yaml(
-        os.path.join(LAUNCH_PATH, 'config/nav2_params_benchmark.yaml'))
+    default_mppi_params.load_from_yaml(constants.DEFAULT_MPPI_PARAMS_PATH)
     controller_benchmark.update_parameters(default_mppi_params)
 
     # init test map (for faster run)
@@ -106,7 +109,7 @@ def main():
         config_path=os.path.join(BASE_PATH, 'config/controller_benchmark_config.yaml'))
 
     try:
-        test_default_benchmark()
+        test_benchmark()
 
         # Wait for the 'q' key press
         while True:

@@ -15,10 +15,14 @@ costmap_msg = nav.getLocalCostmap()
 
 size_x = costmap_msg.metadata.size_x
 size_y = costmap_msg.metadata.size_y
+print(f'Costmap size: {size_x}x{size_y}')
 
 # Convert data (row-major order) to a 2D NumPy array
 costmap_array = np.array(costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
 costmap_array = np.flip(costmap_array, 0)
+# show costmap_array as an image
+# plt.imshow(costmap_array, cmap='gray', aspect='auto', interpolation='none')
+
 # costmap_array = 256 - costmap_array
 
 
@@ -47,22 +51,50 @@ rect_y_min = - height * map_resolution / 2  # The minimum y coordinate of the re
 rect_y_max = height * map_resolution / 2
 # Plot the costmap using matplotlib's imshow
 print(costmap_array.shape)
-print(path_xy)
+# print(path_xy)
+
 
 path_costs = []
 draw_costmap_msg_data = costmap_msg.data
+darw_costmap_array = costmap_array
 for x, y in path_xy:
     x_idx = int((x - origin_x) / map_resolution)
-    y_idx = int((y - origin_y) / map_resolution)
-    draw_costmap_msg_data[y_idx * size_x + x_idx] = 255
+    y_idx = int((y - origin_y) / map_resolution) + 1
 
+    y_idx = height - y_idx
+
+    # ________________
+    radius_cells = int(0.2 / map_resolution)
+
+    # Extract a square subarray around the (x_idx, y_idx) point
+    size_y, size_x = costmap_array.shape
+
+    # Define bounds for subarray to ensure they don't go out of bounds
+    x_min = max(x_idx - radius_cells, 0)
+    x_max = min(x_idx + radius_cells + 1, size_x)
+    y_min = max(y_idx - radius_cells, 0)
+    y_max = min(y_idx + radius_cells + 1, size_y)
+
+    # Create the subarray for the relevant region
+    # y_min = height - y_min
+    # y_max = height - y_max
+    darw_costmap_array[y_min:y_max, x_min:x_max] = 200
+
+for x, y in path_xy:
+    x_idx = int((x - origin_x) / map_resolution)
+    y_idx = int((y - origin_y) / map_resolution) + 1
+    y_idx = height - y_idx
+
+    darw_costmap_array[y_idx, x_idx] = 255
+    # ______________________
+    # draw_costmap_msg_data[y_idx * size_x + x_idx] = 255
 
 print(f'Path costs: {path_costs}')
 drawed_costmap_array = np.array(draw_costmap_msg_data, dtype=np.uint8).reshape((size_y, size_x))
 drawed_costmap_array = np.flip(drawed_costmap_array, 0)
 
 plt.imshow(
-    drawed_costmap_array,
+    darw_costmap_array,
     # cmap='gray',
     aspect='auto', interpolation='none',
     extent=[rect_x_min, rect_x_max, rect_y_min, rect_y_max])

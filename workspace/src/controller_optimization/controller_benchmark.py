@@ -30,6 +30,7 @@ from nav2_msgs.srv import LoadMap
 import rclpy.time
 from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
+from utils.discrete_frechet import FastDiscreteFrechetMatrix, euclidean
 
 import constants
 from utils.controller_results import ControllerResult
@@ -87,6 +88,7 @@ class ControllerBenchmark:
         self.launch_nodes()
 
         self.results: List[ControllerResult] = []
+        self.frechet_calc = FastDiscreteFrechetMatrix(euclidean)
 
     def __del__(self) -> None:
         self.logger.info('Destructor called.')
@@ -124,23 +126,21 @@ class ControllerBenchmark:
             for map_name in map_names:
                 start = PoseStamped()
                 start.header.frame_id = 'map'
-                start.pose.position.x = data.get(map_name)['start_pose']['x']
-                start.pose.position.y = data.get(map_name)['start_pose']['y']
-                yaw = data.get(map_name)['start_pose']['yaw']
+                start.pose.position.x = data[map_name]['start_pose']['x']
+                start.pose.position.y = data[map_name]['start_pose']['y']
+                yaw = data[map_name]['start_pose']['yaw']
                 start.pose.orientation = yaw2quat(yaw)
 
                 goal = PoseStamped()
                 goal.header.frame_id = 'map'
-                goal.pose.position.x = data.get(map_name)['goal_pose']['x']
-                goal.pose.position.y = data.get(map_name)['goal_pose']['y']
-                yaw = data.get(map_name)['goal_pose']['yaw']
+                goal.pose.position.x = data[map_name]['goal_pose']['x']
+                goal.pose.position.y = data[map_name]['goal_pose']['y']
+                yaw = data[map_name]['goal_pose']['yaw']
                 goal.pose.orientation = yaw2quat(yaw)
 
-                yaml_path = os.path.join(BASE_PATH, data.get(map_name)['path'])
+                yaml_path = os.path.join(BASE_PATH, data[map_name]['path'])
                 if not os.path.isfile(yaml_path):
-                    yaml_path = os.path.join(LAUNCH_PATH, data.get(map_name)['path'])
-                    if not os.path.isfile(yaml_path):
-                        raise FileNotFoundError(f'Invalid path to map file: {yaml_path}')
+                    raise FileNotFoundError(f'Invalid path to map file: {yaml_path}')
 
                 mapdata = MapData(
                     name=map_name,
@@ -149,10 +149,15 @@ class ControllerBenchmark:
                     goal=goal)
 
                 # local is optional
-                if data.get(map_name).get('path_local') is not None:
-                    mapdata.yaml_path_local = os.path.join(
-                        BASE_PATH, data.get(map_name)['path_local'])
+                yaml_path_local = data[map_name].get('path_local')
+                if yaml_path_local is not None:
+                    if not os.path.isfile(os.path.join(BASE_PATH, yaml_path_local)):
+                        raise FileNotFoundError(
+                            f'Invalid path to local map file: {yaml_path_local}')
+                    mapdata.yaml_path_local = os.path.join(BASE_PATH, yaml_path_local)
                 else:
+                    self.logger.warn(
+                        'NO LOCAL MAP PATH SPECIFIED, defaulting to global map.')
                     mapdata.yaml_path_local = mapdata.yaml_path
 
                 with open(yaml_path, 'r', encoding='utf-8') as file:
@@ -166,7 +171,7 @@ class ControllerBenchmark:
             self.logger.debug(f'Config: \n {pformat(self.params)}')
             self.logger.debug(f'Map: \n {pformat(self.mapdata_dict)}')
 
-    @timing_decorator(
+    @ timing_decorator(
         lambda self: self.logger.info('Initializing nodes...'),
         lambda self, ex_time: self.logger.info(f'Initialized nodes in {ex_time:.4f} seconds.'))
     def _init_nodes(self) -> None:
@@ -275,7 +280,7 @@ class ControllerBenchmark:
             return False
         return True
 
-    @timing_decorator(
+    @ timing_decorator(
         lambda self: self.logger.info('Launching nodes...'),
         lambda self, ex_time: self.logger.info(f'Launched nodes in {ex_time:.4f} seconds.'))
     def launch_nodes(self):
@@ -321,7 +326,7 @@ class ControllerBenchmark:
             if 'sub' in name:
                 node.collect_data = False
 
-    @timing_decorator(
+    @ timing_decorator(
         lambda self: self.logger.info('Stopping nodes, sub executors, threads...'),
         lambda self, ex_time: self.logger.info(f'Stopped nodes in {ex_time:.4f} seconds.'))
     def stop_nodes(self):
@@ -351,7 +356,7 @@ class ControllerBenchmark:
         except Exception as e:
             raise RuntimeError(f'Failed to stop nodes: {e}') from e
 
-    @timing_decorator(
+    @ timing_decorator(
         lambda self: self.logger.info('Checking if nodes are active...'),
         lambda self, ex_time: self.logger.info(f'Checked nodes in {ex_time:.4f} seconds.')
     )
@@ -548,10 +553,10 @@ class ControllerBenchmark:
         origin_x = costmap_msg.metadata.origin.position.x
         origin_y = costmap_msg.metadata.origin.position.y
         path_costs = []
-        for x, y in result.path_xy:
+        for x, y in odom_xy:
             x_idx = int((x - origin_x) / map_resolution)
             y_idx = int((y - origin_y) / map_resolution)
-            path_costs.append(costmap_msg.data[y_idx * size_x + x_idx])
+            path_costs.append(costmap_array[size_y - y_idx, x_idx])
 
         result.start_time = start_time.nanoseconds * 1e-9
         # result.time_elapsed = time_elapsed
@@ -600,6 +605,7 @@ class ControllerBenchmark:
             odom_xy=result.odom_xy,
             cmd_vel_t=result.cmd_vel_t,
 
+            frechet_distance=self.frechet_calc.distance(result.path_xy, result.odom_xy),
             distance_to_goal=distance_to_goal,
             angle_to_goal=angle_to_goal / np.pi * 180,  # rad to deg
 

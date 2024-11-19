@@ -33,6 +33,7 @@ complex_ref:
     yaw: 0.0
 complex_test:
   path: 'maps/complex.yaml'
+  # path_local: 'maps/complex_local.yaml'
   start_pose:
     x: 0.0
     y: 0.0
@@ -43,6 +44,7 @@ complex_test:
     yaw: 0.0
 turtlebot3:
   path: 'maps/turtlebot3_world.yaml'
+  path_local: 'maps/turtlebot3_world.yaml'
   start_pose:
     x: -2.0
     y: -0.5

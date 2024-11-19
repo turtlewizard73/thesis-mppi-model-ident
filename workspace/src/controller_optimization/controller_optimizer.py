@@ -41,6 +41,7 @@ class RunResult(TypedDict):
     success: bool
     time_elapsed: float
     score: float = 0.0
+    frechet_distance: float = 0.0
     distance_to_goal: float = 0.0
     angle_to_goal: float = 0.0
     avg_cost: float = 0.0
@@ -205,17 +206,20 @@ class ControllerOptimizer:
 
         weight_time = 0.35
         weight_cost = 0.35
+        weight_f = 0.3
         weight_distance = 0.25
         weight_angle = 0.25
 
         normalized_time_elapsed = metric.time_elapsed / max_time
         normalized_avg_cost = metric.avg_cost / max_cost
+        normalized_frechet_distance = metric.frechet_distance / max_distance
         normalized_distance_to_goal = metric.distance_to_goal / max_distance
         normalized_angle_to_goal = metric.angle_to_goal / max_angle
 
         score = (
             weight_time * normalized_time_elapsed +
             weight_cost * normalized_avg_cost +
+            weight_f * normalized_frechet_distance +
             weight_distance * normalized_distance_to_goal +
             weight_angle * normalized_angle_to_goal
         )

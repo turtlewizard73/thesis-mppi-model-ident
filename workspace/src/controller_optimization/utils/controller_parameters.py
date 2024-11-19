@@ -35,7 +35,7 @@ class ControllerCritic:
 @dataclass
 class ControllerParameters:
     """Controller parameters dataclass."""
-    controller_name: str = 'FollowPathMPPI'
+    controller_name: str = 'FollowPath'
     critics: List[ControllerCritic] = field(
         default_factory=lambda: [ControllerCritic(n) for n in DEFAULT_MPPI_CRITIC_NAMES])
 
