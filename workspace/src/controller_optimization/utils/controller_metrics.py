@@ -50,9 +50,17 @@ class ControllerMetric:
         default_factory=lambda: np.empty((0, 1)))  # [rad/s^3] angular jerk
     rms_angular_jerk: float = 0.0  # [rad/s^3] root mean squared angular jerk
 
-    # costs
+    # costmap & costs
+    costmap: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+    costmap_resolution: float = 0.0
+    costmap_origin_x: float = 0.0
+    costmap_origin_y: float = 0.0
+
     path_costs: np.ndarray = field(  # cost of cells along the traversed path
         default_factory=lambda: np.empty((0, 1)))
+
+    # cost of cells along the traversed path in robot radius
+    costmap_masked: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+
     sum_of_costs: float = 0.0  # sum of all costs
     avg_cost: float = 0.0  # average cost
-    rms_cost: float = 0.0  # root mean squared cost

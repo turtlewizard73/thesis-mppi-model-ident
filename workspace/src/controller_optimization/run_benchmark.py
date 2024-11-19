@@ -125,7 +125,6 @@ def main():
         logger.error(f"Exception: {e}")
 
     del controller_benchmark
-    time.sleep(1)
     exit(0)
 
 

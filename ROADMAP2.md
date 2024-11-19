@@ -115,3 +115,14 @@ Benchmarks:
    - parameters: defaults + 1 critic 1-100
    - 100 run (1,2,3....100) times 8 -> 800?
    - waffle, service robot
+
+
+## 2024. 11. 19.
+- visszakerül frechet
+  - hozzá testscript
+  - itt bejön a kérdés amiről lehetne beszélni, hogy ugye ez bünteti score fgv-ben az eltávolodást a plantől
+  - de a controllernek lényege a kinamatiaki feasebility, de a plannereknél soknál nincs ez meg
+    - --->>> ezért nem nagy súllyal
+  - tehát plannerekről összehasonlító ábra
+  - illetve smoothert megnézni
+-

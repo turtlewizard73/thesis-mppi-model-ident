@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing import Dict
 
+# TODO: DONT NEED THIS CLASS ANYMORE, PUT EVERYTHING INTO METRICS
+
 
 @dataclass
 class ControllerResult:
@@ -80,6 +82,10 @@ class ControllerResult:
     #    -> width - uint32
     #    -> height - uint32
     costmap: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+    costmap_resolution: float = 0.0
+    costmap_origin_x: float = 0.0
+    costmap_origin_y: float = 0.0
 
     # cost of every cell in the path
-    path_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+    # path_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+    # path_costs_r: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))

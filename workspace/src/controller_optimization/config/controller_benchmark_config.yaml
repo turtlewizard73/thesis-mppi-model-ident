@@ -1,4 +1,5 @@
 robot_name: turtlebot3_waffle
+robot_radius: 0.22  # [m]
 planner: GridBased
 controller: FollowPath
 # default_controller_params: config/controller_server_params_reformat/default_mppi_params_reformatted.yaml

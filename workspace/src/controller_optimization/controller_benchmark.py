@@ -114,6 +114,7 @@ class ControllerBenchmark:
             self.logger.debug(f'Config: \n {pformat(data)}')
 
             self.params['robot_name'] = data['robot_name']
+            self.params['robot_radius'] = data['robot_radius']
             self.params['planner'] = data['planner']
             self.params['controller'] = data['controller']
             self.params['cmd_vel_topic'] = data['cmd_vel_topic']
@@ -349,7 +350,7 @@ class ControllerBenchmark:
             time.sleep(1)
             self.logger.debug('Stopped sub threads.')
 
-            time.sleep(5)  # wait for nodes to stop
+            time.sleep(1)  # wait for nodes to stop
 
             self.nodes_active = False
 
@@ -549,15 +550,6 @@ class ControllerBenchmark:
             costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
         costmap_array = np.flip(costmap_array, 0)
 
-        map_resolution = costmap_msg.metadata.resolution
-        origin_x = costmap_msg.metadata.origin.position.x
-        origin_y = costmap_msg.metadata.origin.position.y
-        path_costs = []
-        for x, y in odom_xy:
-            x_idx = int((x - origin_x) / map_resolution)
-            y_idx = int((y - origin_y) / map_resolution)
-            path_costs.append(costmap_array[size_y - y_idx, x_idx])
-
         result.start_time = start_time.nanoseconds * 1e-9
         # result.time_elapsed = time_elapsed
         # result.success = True
@@ -573,7 +565,9 @@ class ControllerBenchmark:
         result.critic_scores = critic_scores
         result.critic_scores_t = critic_scores_t
         result.costmap = costmap_array
-        result.path_costs = np.array(path_costs)
+        result.costmap_resolution = costmap_msg.metadata.resolution
+        result.costmap_origin_x = costmap_msg.metadata.origin.position.x
+        result.costmap_origin_y = costmap_msg.metadata.origin.position.y
 
         return result
 
@@ -592,6 +586,29 @@ class ControllerBenchmark:
         acc_ang = newton_diff(result.cmd_vel_omega, dt)
         jerk_ang = newton_diff(acc_ang, dt)
         rms_ang_jerk = np.sqrt(np.mean(jerk_ang**2))
+
+        path_costs = []
+        size_y, size_x = result.costmap.shape
+        radius_cells = int(self.params['robot_radius'] / result.costmap_resolution) + 1
+        radius_masks = np.zeros_like(result.costmap, dtype=bool)
+        for x, y in result.odom_xy:
+            x_idx = int(
+                (x - result.costmap_origin_x) / result.costmap_resolution)
+            y_idx = int(
+                (y - result.costmap_origin_y) / result.costmap_resolution) + 1
+            y_idx = size_y - y_idx
+
+            # get the cost along the path
+            path_costs.append(result.costmap_array[size_y - y_idx, x_idx])
+
+            # get the cost in robot radius
+            Y, X = np.ogrid[:size_y, :size_x]
+            dist_from_center = np.sqrt((X - x_idx)**2 + (Y - y_idx)**2)
+            mask = dist_from_center <= radius_cells
+            radius_masks = np.logical_or(radius_masks, mask)
+
+        costmap_masked = result.costmap.copy()
+        costmap_masked[~radius_masks] = 0
 
         return ControllerMetric(
             controller_name=result.controller_name,
@@ -627,10 +644,16 @@ class ControllerBenchmark:
             angular_jerks=jerk_ang,
             rms_angular_jerk=rms_ang_jerk,
 
+            costmap=result.costmap,
+            costmap_resolution=result.costmap_resolution,
+            costmap_origin_x=result.costmap_origin_x,
+            costmap_origin_y=result.costmap_origin_y,
+
             path_costs=result.path_costs,
-            sum_of_costs=np.sum(result.path_costs),
-            avg_cost=np.mean(result.path_costs),
-            rms_cost=np.sqrt(np.mean(result.path_costs**2))
+
+            costmap_masked=costmap_masked,
+            sum_of_costs=np.sum(costmap_masked),
+            avg_cost=np.mean(costmap_masked),
         )
 
     def save_result(
