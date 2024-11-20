@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 import os
-import time
 import argparse
 
 import constants
@@ -13,7 +12,7 @@ OPTIMIZATION_OUTPUT_PATH = constants.OPTIMIZATION_OUTPUT_PATH
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Setup controller optimizer.')
+    parser = argparse.ArgumentParser(description='Run controller optimizer.')
     logger = setup_run(parser, 'Optimizer', os.path.join(BASE_PATH, 'logs'))
     trial_name = parser.parse_args().trial
 

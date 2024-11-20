@@ -10,15 +10,15 @@ mppi_critic_topic: /mppi_critic_scores
 # maps: [corridor_empty, corridor_mid_obstacles, corridor_side_obstacles]
 reference_map: complex_ref
 maps: [complex, complex_ref, complex_test, turtlebot3]
-complex:
+complex_test:
   path: 'maps/complex.yaml'
-  path_local: 'maps/complex_local.yaml'
+  # path_local: 'maps/complex_local.yaml'
   start_pose:
     x: 0.0
     y: 0.0
     yaw: 0.0
   goal_pose:
-    x: 10.3
+    x: 3.0
     y: 0.0
     yaw: 0.0
 complex_ref:
@@ -32,17 +32,18 @@ complex_ref:
     x: 10.3
     y: 0.0
     yaw: 0.0
-complex_test:
+complex:
   path: 'maps/complex.yaml'
-  # path_local: 'maps/complex_local.yaml'
+  path_local: 'maps/complex_local.yaml'
   start_pose:
     x: 0.0
     y: 0.0
     yaw: 0.0
   goal_pose:
-    x: 3.0
+    x: 10.3
     y: 0.0
     yaw: 0.0
+
 turtlebot3:
   path: 'maps/turtlebot3_world.yaml'
   path_local: 'maps/turtlebot3_world.yaml'

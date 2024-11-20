@@ -702,7 +702,7 @@ class ControllerBenchmark:
         if os.path.isfile(latest_result_txt) is False:
             raise FileNotFoundError(f'File not found: {latest_result_txt}')
 
-        with open(os.path.join(ControllerBenchmark.RESULTS_PATH, 'last_result.txt'), 'r') as f:
+        with open(latest_result_txt, 'r') as f:
             last_result_path = f.read().strip()
 
         if os.path.isfile(last_result_path) is False:
