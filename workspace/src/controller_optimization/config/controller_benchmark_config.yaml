@@ -44,7 +44,6 @@ complex:
     x: 10.3
     y: 0.0
     yaw: 0.0
-
 turtlebot3:
   path: 'maps/turtlebot3_world.yaml'
   path_local: 'maps/turtlebot3_world.yaml'
@@ -56,6 +55,7 @@ turtlebot3:
     x: 0.65
     y: 1.0
     yaw: 1.57
+
 corridor_empty:
   path: 'maps/corridor_empty.yaml'
   start_pose:

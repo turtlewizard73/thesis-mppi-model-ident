@@ -4,7 +4,7 @@
 import logging
 import os
 import yaml
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 from pprint import pformat
 from threading import Thread
 import subprocess
@@ -87,8 +87,6 @@ class ControllerBenchmark:
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
 
-        self.launch_nodes()
-
         self.frechet_calc = FastDiscreteFrechetMatrix(euclidean)
 
     def __del__(self) -> None:
@@ -169,7 +167,7 @@ class ControllerBenchmark:
             self.logger.debug(f'Config: \n {pformat(self.params)}')
             self.logger.debug(f'Map: \n {pformat(self.mapdata_dict)}')
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Initializing nodes...'),
         lambda self, ex_time: self.logger.info(f'Initialized nodes in {ex_time:.4f} seconds.'))
     def _init_nodes(self) -> None:
@@ -404,7 +402,7 @@ class ControllerBenchmark:
 
         return True, 'All nodes are active'
 
-    @timing_decorator(
+    @ timing_decorator(
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
     def run_benchmark(
@@ -834,6 +832,9 @@ class ControllerBenchmark:
     )
     def plot_metric(self, metric: ControllerMetric) -> Figure:
         # for inspecting every data collected and calculated
+        # check if map is loaded
+        if self.current_mapdata is None:
+            self.current_mapdata = self.mapdata_dict[metric.map_name]
 
         # _________________ COLLECTED DATA _________________
         # 1. path and route (x vs y) and costmap

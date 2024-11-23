@@ -41,7 +41,7 @@ def setup_run(
         '-o', '--optimizer', action='store_true', default=False,
         help='Run in optimizer mode.')
     parser.add_argument(
-        '-t', '--trial', type=str, default='',
+        '-t', '--trial', type=str, default='default',
         help='Name of the trial to run if using optimizer mode.')
 
     args = parser.parse_args()

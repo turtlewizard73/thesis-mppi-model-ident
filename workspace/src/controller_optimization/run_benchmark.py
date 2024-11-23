@@ -107,7 +107,7 @@ def run_optimizer():
         config_path=OPTIMIZER_CONFIG_PATH)
 
     # setup optimizer
-    if args.trial == '':
+    if args.trial == 'default':
         logger.warning("No trial selected, using default.")
         args.trial = 'test_trial'
     optimizer.setup_run(trial_name=args.trial)
@@ -137,6 +137,7 @@ def main():
             raise ValueError("Invalid run mode.")
     except Exception as e:
         logger.error(e)
+        traceback.print_exc()
         return 1
     else:
         return 0
