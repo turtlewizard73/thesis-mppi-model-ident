@@ -25,7 +25,6 @@ OCCUPANCY_WALL = 100
 
 # ControllerBenchmark
 TIMESTAMP_FORMAT = '%Y-%m-%d_%H-%M-%S'
-DEFAULT_BENCHMARK_CONFIG = BASE_PATH + '/config/controller_benchmark_config.yaml'
 
 
 class Robots(Enum):

@@ -62,7 +62,7 @@ class ControllerOptimizer:
 
         self.cb = ControllerBenchmark(
             logger=logger.getChild('Benchmark'),
-            config_path=constants.DEFAULT_BENCHMARK_CONFIG)
+            config_path=constants.BENCHMARK_CONFIG_PATH)
         self.cb.launch_nodes()
 
         self.final_output_rows: List[Dict] = []
@@ -121,9 +121,9 @@ class ControllerOptimizer:
         self.output_final_csv_path = os.path.join(self.work_dir, 'final_results.csv')
         self.output_yaml_path = os.path.join(self.work_dir, 'summary.yaml')
 
+        # overwrite paths
         self.cb.result_save_path = os.path.join(self.work_dir, 'results')
         self.cb.metric_save_path = os.path.join(self.work_dir, 'metrics')
-        self.cb.setup_directories()
 
     def setup_run(
             self, trial_name: str, timeout: float = 0.0,
