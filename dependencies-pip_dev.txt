@@ -1,9 +1,8 @@
 transforms3d
 seaborn
 tabulate
-
 numba
 psutil
 memory_profiler
-
 scikit-optimize
+numpy==1.22.0

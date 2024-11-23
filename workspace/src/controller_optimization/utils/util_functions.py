@@ -1,13 +1,11 @@
 #! /usr/bin/env python3
 
 # Common modules
-import csv
 import os
 import argparse
 import logging
 from time import strftime
 import time
-# import yaml
 import yaml
 import numpy as np
 from functools import wraps
@@ -18,23 +16,47 @@ from geometry_msgs.msg import Quaternion
 
 
 def setup_run(
-        parser: argparse.ArgumentParser = None,
-        logger_name: str = 'ControllerBenchmark',
-        log_file_path: str = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/logs') -> logging.Logger:
-    parser = parser if parser is not None else argparse.ArgumentParser('Setup run script.')
+        parser: argparse.ArgumentParser,
+        time_stamp_format: str,
+        log_path: str) -> logging.Logger:
+
     parser.add_argument(
         '-d', '--debug', action='store_true', default=False,
         help='Run in debug mode.')
     parser.add_argument(
-        '-t', '--trial', type=str, default='test_trial',)
+        '-b', '--benchmark', action='store_true', default=False,
+        help='Run in benchmark mode.')
+    parser.add_argument(
+        '-m', '--map', type=str, default='default',
+        help='Name of the map to run if using benchmark mode.')
+    parser.add_argument(
+        '-r', '--random', action='store_true', default=False,
+        help='Randomize parameters.')
+
+    parser.add_argument(
+        '-p', '--plot-last', action='store_true', default=False,
+        help='Plot the last result.')
+
+    parser.add_argument(
+        '-o', '--optimizer', action='store_true', default=False,
+        help='Run in optimizer mode.')
+    parser.add_argument(
+        '-t', '--trial', type=str, default='default',
+        help='Name of the trial to run if using optimizer mode.')
+
     args = parser.parse_args()
 
-    # LOGGING
-    if not os.path.exists(log_file_path):
-        os.makedirs(log_file_path)
-    # log_file_path = os.path.join(log_file_path, logger_name.lower())
-    # if not os.path.exists(log_file_path):
-    #     os.makedirs(log_file_path)
+    # Set logger name
+    if args.benchmark is True:
+        logger_name = 'Run-Benchmark'
+    elif args.optimizer is True:
+        logger_name = 'Run-Optimizer'
+    else:
+        logger_name = 'Run'
+
+    # ___ SETUP LOGGING ___
+    if not os.path.exists(log_path):
+        os.makedirs(log_path)
 
     logging_level = logging.DEBUG if args.debug is True else logging.INFO
     logger = logging.getLogger(logger_name)
@@ -44,10 +66,11 @@ def setup_run(
     ch = logging.StreamHandler()
     ch.setLevel(logging_level)
     # create file handler
-    stamp = strftime('%Y-%m-%d-%H-%M-%S')
-    log_file = os.path.join(log_file_path, f'{logger_name.lower()}_{stamp}.log')
+    stamp = strftime(time_stamp_format)
+    log_file_path = os.path.join(
+        log_path, f'{logger_name.lower()}_{stamp}.log')
     fh = logging.FileHandler(
-        filename=log_file,
+        filename=log_file_path,
         mode='w',
         encoding='utf-8')
     fh.setLevel(logging_level)
@@ -60,12 +83,36 @@ def setup_run(
     # add ch and fh to logger
     logger.addHandler(ch)
     logger.addHandler(fh)
+
+    logger.info(f"Log file path: {log_file_path}")
+
+    # Check if the user has selected a mode
+    if args.benchmark is True and args.optimizer is True:
+        raise ValueError("Cannot run in both benchmark and optimizer mode.")
+
+    if args.benchmark is False and args.optimizer is False:
+        logger.warning("No mode selected, running in benchmark mode.")
+        args.benchmark = True
+
+    # Edge cases
+    if args.optimizer is True:
+        if args.random is True:
+            logger.warning("Random flag is ignored in optimizer mode.")
+        if args.plot_last is True:
+            logger.warning("Plot last flag is ignored in optimizer mode.")
+        if args.map != '':
+            logger.warning("Map flag is ignored in optimizer mode.")
+
+    if args.benchmark is True:
+        if args.trial != '':
+            logger.warning("Trial flag is ignored in benchmark mode.")
+
     return logger
 
 
 def timing_decorator(on_start, on_end):
     def decorator(func):
-        @wraps(func)
+        @ wraps(func)
         def wrapper(*args, **kwargs):
             context = args[0]
 

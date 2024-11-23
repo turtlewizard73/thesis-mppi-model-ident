@@ -1,5 +1,6 @@
 trials:
   - test_trial
+  - test_random
   - default_distribution
   - enjoy_distribution
   - burger_distribution
@@ -9,6 +10,20 @@ test_trial:
   map: complex_test
   robot: waffle
   generator: default
+  score_method: default
+  runs: 2
+  run_timeout: 60
+# test_maps:
+#   maps: [complex_test, complex_ref, complex, turtlebot3]
+#   robot: waffle
+#   generator: default
+#   score_method: default
+#   runs: 2
+#   run_timeout: 60
+test_random:
+  map: complex_test
+  robot: waffle
+  generator: random
   score_method: default
   runs: 2
   run_timeout: 60
@@ -24,14 +39,14 @@ enjoy_distribution:
   robot: enjoy
   generator: default
   score_method: default
-  runs: 20
+  runs: 100
   run_timeout: 60
 burger_distribution:
   map: complex_ref
   robot: burger
   generator: default
   score_method: default
-  runs: 20
+  runs: 100
   run_timeout: 60
 waffle_random:
   map: complex_ref
@@ -45,5 +60,12 @@ waffle_grid:
   robot: waffle
   generator: grid
   score_method: default
-  runs: 0
+  runs: 808
+  run_timeout: 60
+enjoy_distribution_enjoy_params:
+  map: complex_ref
+  robot: enjoy
+  generator: default
+  score_method: default
+  runs: 100
   run_timeout: 60

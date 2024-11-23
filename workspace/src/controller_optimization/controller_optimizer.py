@@ -4,8 +4,7 @@ from pprint import pformat
 import yaml
 import time
 from typing import List, Dict, TypedDict, Callable
-from enum import Enum, auto
-from dataclasses import dataclass
+from enum import Enum
 from copy import deepcopy
 import numpy as np
 import pandas as pd
@@ -42,6 +41,7 @@ class RunResult(TypedDict):
     success: bool
     time_elapsed: float
     score: float = 0.0
+    frechet_distance: float = 0.0
     distance_to_goal: float = 0.0
     angle_to_goal: float = 0.0
     avg_cost: float = 0.0
@@ -62,7 +62,7 @@ class ControllerOptimizer:
 
         self.cb = ControllerBenchmark(
             logger=logger.getChild('Benchmark'),
-            config_path=constants.DEFAULT_BENCHMARK_CONFIG)
+            config_path=constants.BENCHMARK_CONFIG_PATH)
         self.cb.launch_nodes()
 
         self.final_output_rows: List[Dict] = []
@@ -121,9 +121,9 @@ class ControllerOptimizer:
         self.output_final_csv_path = os.path.join(self.work_dir, 'final_results.csv')
         self.output_yaml_path = os.path.join(self.work_dir, 'summary.yaml')
 
+        # overwrite paths
         self.cb.result_save_path = os.path.join(self.work_dir, 'results')
         self.cb.metric_save_path = os.path.join(self.work_dir, 'metrics')
-        self.cb.setup_directories()
 
     def setup_run(
             self, trial_name: str, timeout: float = 0.0,
@@ -185,11 +185,13 @@ class ControllerOptimizer:
             self.cb.update_parameters(self.test_params)
             yield i
 
-    def generator_grid(self, n: int):
+    def generator_grid(self):
+        n = 101
+        scale = 1
         # generate grid and update the controller benchmark
         i = 1
         for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
-            grid_space = np.arange(0, 101, 1)
+            grid_space = np.arange(0, n, scale)
             for v in grid_space:
                 self.test_params.set_critic_weight(critic, v)
                 yield i
@@ -204,17 +206,20 @@ class ControllerOptimizer:
 
         weight_time = 0.35
         weight_cost = 0.35
+        weight_f = 0.3
         weight_distance = 0.25
         weight_angle = 0.25
 
         normalized_time_elapsed = metric.time_elapsed / max_time
         normalized_avg_cost = metric.avg_cost / max_cost
+        normalized_frechet_distance = metric.frechet_distance / max_distance
         normalized_distance_to_goal = metric.distance_to_goal / max_distance
         normalized_angle_to_goal = metric.angle_to_goal / max_angle
 
         score = (
             weight_time * normalized_time_elapsed +
             weight_cost * normalized_avg_cost +
+            weight_f * normalized_frechet_distance +
             weight_distance * normalized_distance_to_goal +
             weight_angle * normalized_angle_to_goal
         )
@@ -313,23 +318,22 @@ class ControllerOptimizer:
         best_params: ControllerParameters = deepcopy(self.test_params)
         best_metric_path = 'None'
 
-        num_trials = 0
+        num_trials = self.current_trial['runs']
         successful_trials = 0
         loop_start_time = time.time()
         try:
             for i in self.generator():
-                self.logger.info(f"Running trial {trial_name}: {i}")
+                self.logger.info(f"Running trial {trial_name}: {i}/{num_trials}")
 
-                num_trials += 1
                 run_result: RunResult = self._run(i)
                 if run_result['success'] is False:
-                    self.logger.warn(f"Failed to run trial {i}")
+                    self.logger.warn(f"Failed to run trial {i}/{num_trials}")
                     continue
 
                 successful_trials += 1
 
                 score = run_result['score']
-                self.logger.info(f"Trial {i} finished with score: {score}")
+                self.logger.info(f"Trial {i}/{num_trials} finished with score: {score}")
                 if run_result['score'] < best_score:
                     best_score = score
                     best_params = deepcopy(self.test_params)
@@ -365,3 +369,4 @@ class ControllerOptimizer:
                 yaml.dump(
                     {**self.current_trial, **run_summary},
                     file, default_flow_style=False, sort_keys=False)
+            self.cb.stop_nodes()

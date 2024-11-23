@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from typing import Dict
 
+# TODO: DONT NEED THIS CLASS ANYMORE, PUT EVERYTHING INTO METRICS
+
 
 @dataclass
 class ControllerResult:
@@ -38,10 +40,6 @@ class ControllerResult:
     #        -> x, y, z, w - float64
     odom_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
     odom_omega: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
-    # odometry t from
-    # nav_msg/Odometry
-    #  -> header - std_msgs/Header
-    #    -> stamp - time [nanoseconds]
     odom_t: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
 
     # odometry vx vy from
@@ -52,17 +50,10 @@ class ControllerResult:
     #  -> twist - geometry_msgs/Twist
     #    -> linear - geometry_msgs/Vector3
     #      -> x, y - float64
-    cmd_vel_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
-    # cmd_vel vomega from
-    # geometry_msgs/TwistStamped
-    #  -> twist - geometry_msgs/Twist
     #    -> angular - geometry_msgs/Vector3
     #      -> z - float64
+    cmd_vel_xy: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
     cmd_vel_omega: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
-    # cmd_vel t from
-    # geometry_msgs/TwistStamped
-    #  -> header - std_msgs/Header
-    #    -> stamp - time [nanoseconds]
     cmd_vel_t: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
 
     # mppi critic scores
@@ -80,6 +71,10 @@ class ControllerResult:
     #    -> width - uint32
     #    -> height - uint32
     costmap: np.ndarray = field(default_factory=lambda: np.empty((0, 2)))
+    costmap_resolution: float = 0.0
+    costmap_origin_x: float = 0.0
+    costmap_origin_y: float = 0.0
 
     # cost of every cell in the path
-    path_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+    # path_costs: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
+    # path_costs_r: np.ndarray = field(default_factory=lambda: np.empty((0, 1)))
