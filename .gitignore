@@ -9,7 +9,6 @@ nav2_humble_cache/*
 *.pickle
 *.log
 *__pycache__*
-workspace/src/controller_optimization/optimization_results/*
 results/*
 metrics/*
 optimization_results/*

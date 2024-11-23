@@ -1,12 +1,11 @@
 #! /usr/bin/env python3
 
-import os
+import traceback
 import argparse
 import matplotlib.pyplot as plt
 
 import constants
 from utils.util_functions import setup_run
-from utils.controller_results import ControllerResult
 from utils.controller_metrics import ControllerMetric
 from utils.controller_parameters import ControllerParameters
 from controller_benchmark import ControllerBenchmark
@@ -23,49 +22,56 @@ global args, logger
 def run_benchmark():
     global args, logger
 
-    # init benchmark
-    benchmark = ControllerBenchmark(
-        logger=logger,
-        config_path=BENCHMARK_CONFIG_PATH)
+    try:
+        # init benchmark
+        benchmark = ControllerBenchmark(
+            logger=logger,
+            config_path=BENCHMARK_CONFIG_PATH)
 
-    # init parameters
-    default_mppi_params = ControllerParameters()
-    default_mppi_params.load_from_yaml(DEFAULT_MPPI_PARAMS_PATH)
-    if args.random is True:
-        default_mppi_params.randomize_parameters()
-    benchmark.update_parameters(default_mppi_params)
+        # init parameters
+        default_mppi_params = ControllerParameters()
+        default_mppi_params.load_from_yaml(DEFAULT_MPPI_PARAMS_PATH)
+        if args.random is True:
+            default_mppi_params.randomize_parameters()
+        benchmark.update_parameters(default_mppi_params)
 
-    # init map
-    if args.map == '':
-        logger.warning("No map selected, using default.")
-        args.map = 'complex_test'
-    benchmark.update_map(args.map)
+        # init map
+        if args.map == 'default':
+            logger.warning("No map selected, using default.")
+            benchmark.update_map()
+        else:
+            benchmark.update_map(args.map)
 
-    # run benchmark
-    benchmark.launch_nodes()
-    result: ControllerResult = benchmark.run_benchmark()
-    benchmark.stop_nodes()
+        # run benchmark
+        benchmark.launch_nodes()
+        metric: ControllerMetric = benchmark.run_benchmark()
+        benchmark.stop_nodes()
 
-    result_path = benchmark.save_result(result)
-    logger.info(f"Saved result to {result_path}")
+        metric_path = benchmark.save_metric(metric)
+        logger.info(f"Saved metric to {metric_path}")
 
-    # calculate metric
-    metric: ControllerMetric = benchmark.calculate_metric(result)
-    metric_path = benchmark.save_metric(metric)
-    logger.info(f"Saved metric to {metric_path}")
+        # print data
+        logger.info('Printing Mapdata.')
+        logger.info('\n' + benchmark.print_mapdata())
+        logger.info('Printing Parameters.')
+        logger.info('\n' + benchmark.print_parameters())
+        logger.info('Printing Metric.')
+        logger.info('\n' + benchmark.print_metric_data(metric))
 
-    # plot results
-    fig_result = benchmark.plot_result(result)
-    fig_metric = benchmark.plot_metric(metric)
-    plt.show(block=False)
+        # plot results
+        fig_metric = benchmark.plot_metric(metric)
+        plt.show(block=False)
 
-    while True:
-        key = input("Press 'q' to quit: ").strip().lower()
-        if key == 'q':
-            break
-    plt.close('all')
-
-    del benchmark
+        while True:
+            key = input("Press 'q' to quit: ").strip().lower()
+            if key == 'q':
+                break
+    except Exception as e:
+        logger.error(e)
+        traceback.print_exc()
+    finally:
+        plt.close('all')
+        del benchmark
 
 
 def plot_last():
@@ -77,11 +83,9 @@ def plot_last():
         config_path=BENCHMARK_CONFIG_PATH)
 
     # read last result and metric
-    result = benchmark.load_last_result()
     metric = benchmark.load_last_metric()
 
     # plot results
-    fig_result = benchmark.plot_result(result)
     fig_metric = benchmark.plot_metric(metric)
     plt.show(block=False)
 

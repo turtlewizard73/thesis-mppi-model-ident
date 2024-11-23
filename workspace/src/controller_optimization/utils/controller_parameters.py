@@ -70,13 +70,11 @@ class ControllerParameters:
 
     def load_from_yaml(self, file_path: str):
         """Loads the Controller parameters from a YAML file."""
-        print(f'Loading Controller parameters from {file_path}')
 
         with open(file_path, 'r', encoding='utf-8') as f:
             data = yaml.safe_load(f)
 
             mppi_plugin_dict = self._find_mppi_controller(data)
-            print(mppi_plugin_dict)
 
             for critic in self.critics:
                 critic_dict = mppi_plugin_dict.get(critic.name)

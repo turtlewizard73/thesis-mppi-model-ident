@@ -8,6 +8,7 @@ odom_topic: /odom
 costmap_topic: /local_costmap/costmap
 mppi_critic_topic: /mppi_critic_scores
 # maps: [corridor_empty, corridor_mid_obstacles, corridor_side_obstacles]
+default_map: complex_test
 reference_map: complex_ref
 maps: [complex, complex_ref, complex_test, turtlebot3]
 complex_test:

@@ -27,11 +27,12 @@ def setup_run(
         '-b', '--benchmark', action='store_true', default=False,
         help='Run in benchmark mode.')
     parser.add_argument(
-        '-m', '--map', type=str, default='',
+        '-m', '--map', type=str, default='default',
         help='Name of the map to run if using benchmark mode.')
     parser.add_argument(
         '-r', '--random', action='store_true', default=False,
         help='Randomize parameters.')
+
     parser.add_argument(
         '-p', '--plot-last', action='store_true', default=False,
         help='Plot the last result.')
@@ -44,13 +45,6 @@ def setup_run(
         help='Name of the trial to run if using optimizer mode.')
 
     args = parser.parse_args()
-
-    # Check if the user has selected a mode
-    if args.benchmark is True and args.optimizer is True:
-        raise ValueError("Cannot run in both benchmark and optimizer mode.")
-
-    if args.benchmark is False and args.optimizer is False:
-        args.benchmark = True
 
     # Set logger name
     if args.benchmark is True:
@@ -91,6 +85,14 @@ def setup_run(
     logger.addHandler(fh)
 
     logger.info(f"Log file path: {log_file_path}")
+
+    # Check if the user has selected a mode
+    if args.benchmark is True and args.optimizer is True:
+        raise ValueError("Cannot run in both benchmark and optimizer mode.")
+
+    if args.benchmark is False and args.optimizer is False:
+        logger.warning("No mode selected, running in benchmark mode.")
+        args.benchmark = True
 
     # Edge cases
     if args.optimizer is True:
