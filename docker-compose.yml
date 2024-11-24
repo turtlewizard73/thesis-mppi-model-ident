@@ -34,7 +34,7 @@ services:
     group_add:
       - plugdev
 
-  thesis_container_dev2:
+  thesis_container_dev72:
     image: ${DOCKER_REGISTRY}thesis_container_dev
     platform: linux/amd64
     build:
@@ -43,7 +43,7 @@ services:
       args:
         USERNAME: turtlewizard
         ROS_DISTRO: humble
-    container_name: thesis_container_dev2
+    container_name: thesis_container_dev72
     network_mode: "host"
     environment:
       - DISPLAY=:0.0
@@ -69,7 +69,7 @@ services:
     group_add:
       - plugdev
 
-  thesis_container_dev3:
+  thesis_container_dev71:
     image: ${DOCKER_REGISTRY}thesis_container_dev
     platform: linux/amd64
     build:
@@ -78,7 +78,7 @@ services:
       args:
         USERNAME: turtlewizard
         ROS_DISTRO: humble
-    container_name: thesis_container_dev3
+    container_name: thesis_container_dev71
     network_mode: "host"
     environment:
       - DISPLAY=:0.0
@@ -86,6 +86,41 @@ services:
       - ROS_DOMAIN_ID=71
       - TURTLE_HOME_IP=100.85.120.127
       - GAZEBO_MASTER_URI=localhost:11347
+      # - MIXINS
+      # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
+    logging:
+      driver: "journald"
+    stdin_open: true
+    tty: true
+    stop_signal: SIGINT
+    privileged: true
+    volumes:
+      - /dev:/dev
+      - ./:/home/turtlewizard/thesis-mppi-model-ident
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ~/.gitconfig:/home/turtlewizard/.gitconfig
+      - ~/.ssh:/home/turtlewizard/.ssh
+      - /usr/share/gazebo-11/models:/usr/share/gazebo-11/models
+    group_add:
+      - plugdev
+
+  thesis_container_dev70:
+    image: ${DOCKER_REGISTRY}thesis_container_dev
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USERNAME: turtlewizard
+        ROS_DISTRO: humble
+    container_name: thesis_container_dev70
+    network_mode: "host"
+    environment:
+      - DISPLAY=:0.0
+      - MAKEFLAGS="-j6 -l6"
+      - ROS_DOMAIN_ID=70
+      - TURTLE_HOME_IP=100.85.120.127
+      - GAZEBO_MASTER_URI=localhost:11348
       # - MIXINS
       # - CCACHE_DIR="/home/ubuntu/.cache/ccache"
     logging:
