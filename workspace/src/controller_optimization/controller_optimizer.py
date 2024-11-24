@@ -194,6 +194,7 @@ class ControllerOptimizer:
             grid_space = np.arange(0, n, scale)
             for v in grid_space:
                 self.test_params.set_critic_weight(critic, v)
+                self.cb.update_parameters(self.test_params)
                 yield i
                 i += 1
 

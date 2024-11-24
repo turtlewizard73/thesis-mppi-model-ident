@@ -25,14 +25,14 @@ test_random:
   score_method: default
   runs: 2
   run_timeout: 60
-default_distribution:
+default_distribution:  # ran on local default_distribution_2024-11-24_13-23-28
   map: complex_ref  # without local
   robot: waffle
   generator: default
   score_method: default
   runs: 100
   run_timeout: 60
-enjoy_distribution:
+enjoy_distribution:  # running in ws sim 0
   map: complex_ref
   robot: enjoy
   generator: default
@@ -46,21 +46,21 @@ enjoy_distribution_w_enjoy_params:
   score_method: default
   runs: 100
   run_timeout: 60
-burger_distribution:
+burger_distribution:  # running in ws sim 71
   map: complex_ref
   robot: burger
   generator: default
   score_method: default
   runs: 100
   run_timeout: 60
-waffle_random:
+waffle_random:  # running in ws sim 72
   map: complex_ref
   robot: waffle
   generator: random
   score_method: default
   runs: 400
   run_timeout: 60
-waffle_grid:
+waffle_grid:  # running in ws sim 73
   map: complex_ref
   robot: waffle
   generator: grid
