@@ -3,9 +3,14 @@ trials:
   - test_random
   - default_distribution
   - enjoy_distribution
+  - enjoy_distribution_w_enjoy_params
   - burger_distribution
   - waffle_random
   - waffle_grid
+  - waffle_bayesian
+  - enjoy_random
+  - enjoy_grid
+  - enjoy_bayesian
 test_trial:
   map: complex_ref
   robot: waffle
@@ -34,6 +39,13 @@ enjoy_distribution:
   score_method: default
   runs: 100
   run_timeout: 60
+enjoy_distribution_w_enjoy_params:
+  map: complex_ref
+  robot: enjoy
+  generator: default
+  score_method: default
+  runs: 100
+  run_timeout: 60
 burger_distribution:
   map: complex_ref
   robot: burger
@@ -55,10 +67,31 @@ waffle_grid:
   score_method: default
   runs: 808
   run_timeout: 60
-enjoy_distribution_enjoy_params:
+waffle_bayesian:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian
+  score_method: default
+  runs: 500
+  run_timeout: 60
+enjoy_random:
   map: complex_ref
   robot: enjoy
-  generator: default
+  generator: random
   score_method: default
-  runs: 100
+  runs: 400
+  run_timeout: 60
+enjoy_grid:
+  map: complex_ref
+  robot: enjoy
+  generator: grid
+  score_method: default
+  runs: 808
+  run_timeout: 60
+enjoy_bayesian:
+  map: complex_ref
+  robot: enjoy
+  generator: bayesian
+  score_method: default
+  runs: 500
   run_timeout: 60
