@@ -3,6 +3,7 @@
 import traceback
 import argparse
 import matplotlib.pyplot as plt
+import faulthandler
 
 import constants
 from utils.util_functions import setup_run
@@ -17,6 +18,7 @@ OPTIMIZER_CONFIG_PATH = constants.OPTIMIZER_CONFIG_PATH
 DEFAULT_MPPI_PARAMS_PATH = constants.DEFAULT_MPPI_PARAMS_PATH
 
 global args, logger
+faulthandler.enable()
 
 
 def run_benchmark():
@@ -101,20 +103,24 @@ def plot_last():
 def run_optimizer():
     global args, logger
 
-    # init optimizer
-    optimizer = ControllerOptimizer(
-        logger=logger,
-        config_path=OPTIMIZER_CONFIG_PATH)
+    try:
+        # init optimizer
+        optimizer = ControllerOptimizer(
+            logger=logger,
+            config_path=OPTIMIZER_CONFIG_PATH)
 
-    # setup optimizer
-    if args.trial == 'default':
-        logger.warning("No trial selected, using default.")
-        args.trial = 'test_trial'
-    optimizer.setup_run(trial_name=args.trial)
+        # setup optimizer
+        if args.trial == 'default':
+            logger.warning("No trial selected, using default.")
+            args.trial = 'test_trial'
+        optimizer.setup_run(trial_name=args.trial)
 
-    # run optimizer
-    optimizer.run_reference()
-    optimizer.run()
+        # run optimizer
+        optimizer.run_reference()
+        optimizer.run()
+    except Exception as e:
+        logger.error(e)
+        traceback.print_exc()
 
     del optimizer
 

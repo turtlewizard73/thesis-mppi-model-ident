@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 import pickle
 from tabulate import tabulate
+import similaritymeasures
 
 # ros imports
 import rclpy
@@ -31,7 +32,6 @@ from nav2_msgs.srv import LoadMap
 import rclpy.time
 from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
-from utils.discrete_frechet import FastDiscreteFrechetMatrix, euclidean
 
 import constants
 from utils.controller_metrics import ControllerMetric
@@ -86,8 +86,6 @@ class ControllerBenchmark:
 
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
-
-        self.frechet_calc = FastDiscreteFrechetMatrix(euclidean)
 
     def __del__(self) -> None:
         self.logger.info('Destructor called.')
@@ -582,13 +580,13 @@ class ControllerBenchmark:
         metric.costmap_origin_x = costmap_msg.metadata.origin.position.x
         metric.costmap_origin_y = costmap_msg.metadata.origin.position.y
 
-        return metric
-
     @timing_decorator(
         lambda self: self.logger.info('Calculating metric...'),
         lambda self, ex_time: self.logger.info(f'Calculated metric in {ex_time:.4f} seconds.'))
-    def calculate_metric(self, metric: ControllerMetric) -> ControllerMetric:
-        metric.frechet_distance = self.frechet_calc.distance(metric.path_xy, metric.odom_xy)
+    def calculate_metric(self, metric: ControllerMetric):
+        # metric.frechet_distance = self.frechet_calc.distance(metric.path_xy, metric.odom_xy)
+        metric.frechet_distance = similaritymeasures.frechet_dist(metric.path_xy, metric.odom_xy)
+
         metric.distance_to_goal = np.linalg.norm(metric.path_xy[-1] - metric.odom_xy[-1])
         metric.angle_to_goal = metric.path_omega[-1] - \
             metric.odom_omega[-1]  # FIXME: it could be quaternion
@@ -646,8 +644,6 @@ class ControllerBenchmark:
         metric.path_costs = path_costs
         metric.sum_of_costs = np.sum(costmap_masked)
         metric.avg_cost = np.mean(costmap_masked)
-
-        return metric
 
     def save_metric(
             self, metric: ControllerMetric,

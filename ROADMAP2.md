@@ -126,3 +126,8 @@ Benchmarks:
   - tehát plannerekről összehasonlító ábra
   - illetve smoothert megnézni
 -
+
+## 2024. 11. 24.
+- run script refactored
+- result class deleted
+- https://pypi.org/project/similaritymeasures/ is used

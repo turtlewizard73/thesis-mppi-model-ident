@@ -227,24 +227,23 @@ class ControllerOptimizer:
         return float(score)
 
     def _run(self, run_uid: str):
-        result = self.cb.run_benchmark(run_uid=run_uid)
+        metric = self.cb.run_benchmark(run_uid=run_uid)
 
-        if not result.success:
+        if not metric.success:
             return RunResult(
                 id=run_uid,
                 success=False,
-                time_elapsed=result.time_elapsed,
-                status_msg=result.status_msg,
+                time_elapsed=metric.time_elapsed,
+                status_msg=metric.status_msg,
             )
 
-        metric = self.cb.calculate_metric(result)
         metric_path = self.cb.save_metric(metric)
         score = self.score_method(metric)
 
         return RunResult(
             id=run_uid,
             success=True,
-            time_elapsed=result.time_elapsed,
+            time_elapsed=metric.time_elapsed,
             score=score,
             distance_to_goal=metric.distance_to_goal,
             angle_to_goal=metric.angle_to_goal,
@@ -260,23 +259,26 @@ class ControllerOptimizer:
     def run_reference(self) -> bool:
         self.logger.info("Running reference benchmark")
 
+        # setup
         self.cb.update_parameters(self.reference_params)
         self.cb.update_map(self.current_trial['map'])
 
         # 120 seconds timeout should be enough for the reference run
-        result = self.cb.run_benchmark(run_uid='reference', timeout=120)
-        if result.success is False:
-            self.logger.error(f"Failed to run reference benchmark: {result.status_msg}")
+        metric: ControllerMetric = self.cb.run_benchmark(
+            run_uid='reference', timeout=120)
+        if metric.success is False:
+            self.logger.error(
+                f"Failed to run reference benchmark: {metric.status_msg}")
             return False
 
-        self.reference_metric = self.cb.calculate_metric(result)
+        self.reference_metric = metric
         self.reference_metric_path = self.cb.save_metric(self.reference_metric)
         self.reference_score = self.score_method(self.reference_metric)
 
         ref_run_result = RunResult(
             id='reference',
             success=True,
-            time_elapsed=result.time_elapsed,
+            time_elapsed=metric.time_elapsed,
             score=self.reference_score,
             distance_to_goal=self.reference_metric.distance_to_goal,
             angle_to_goal=self.reference_metric.angle_to_goal,
@@ -312,7 +314,7 @@ class ControllerOptimizer:
         self.logger.info(f'Updating map: {self.current_trial["map"]}')
         self.cb.update_map(self.current_trial['map'])
 
-        self.logger.info(f"Running optimizer for trial: {trial_name}")
+        self.logger.debug(f"Running optimizer for trial: {trial_name}")
 
         best_score = 1e9
         best_params: ControllerParameters = deepcopy(self.test_params)

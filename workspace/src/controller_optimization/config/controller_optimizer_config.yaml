@@ -7,19 +7,12 @@ trials:
   - waffle_random
   - waffle_grid
 test_trial:
-  map: complex_test
+  map: complex_ref
   robot: waffle
   generator: default
   score_method: default
   runs: 2
   run_timeout: 60
-# test_maps:
-#   maps: [complex_test, complex_ref, complex, turtlebot3]
-#   robot: waffle
-#   generator: default
-#   score_method: default
-#   runs: 2
-#   run_timeout: 60
 test_random:
   map: complex_test
   robot: waffle
