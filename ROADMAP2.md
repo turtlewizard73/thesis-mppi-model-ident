@@ -131,3 +131,15 @@ Benchmarks:
 - run script refactored
 - result class deleted
 - https://pypi.org/project/similaritymeasures/ is used
+
+
+## 2024. 12. 12. TODOs
+- add mppi params hot reload (to run - pl: only want to change one parameter)
+- BIG ASS TODO: check map picture on graph
+![alt text](image.png)
+- fix enjoy params for launch (add reload? - nooo why)
+  - remove voxel layer ->       plugins: ["voxel_layer", "inflation_layer"]
+  - and more
+- add robot name param get to set gazebo node position with
+- add optional plan smoothing
+- add optinal odometry noise
