@@ -563,6 +563,7 @@ class ControllerBenchmark:
         costmap_msg: Costmap = self.nav.getLocalCostmap()
         size_x = costmap_msg.metadata.size_x
         size_y = costmap_msg.metadata.size_y
+        # FIXME: only with rolling=false
         costmap_array = np.array(
             costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
         costmap_array = np.flip(costmap_array, 0)
@@ -629,6 +630,8 @@ class ControllerBenchmark:
             y_idx = size_y - y_idx
 
             # get the cost along the path
+            # TODO: add some resolution scaling to this
+            # problem: config local_costmap resolution not same as maps
             path_costs.append(metric.costmap[size_y - y_idx, x_idx])
 
             # get the cost in robot radius
