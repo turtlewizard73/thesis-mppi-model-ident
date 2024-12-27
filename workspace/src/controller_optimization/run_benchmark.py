@@ -34,7 +34,7 @@ def run_benchmark():
         default_mppi_params = ControllerParameters()
         default_mppi_params.load_from_yaml(DEFAULT_MPPI_PARAMS_PATH)
         if args.random is True:
-            default_mppi_params.randomize_parameters()
+            default_mppi_params.randomize_weights()
         benchmark.update_parameters(default_mppi_params)
 
         # init map
