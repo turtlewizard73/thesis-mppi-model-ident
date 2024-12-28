@@ -136,6 +136,9 @@ class ControllerOptimizer:
         if timeout > 0.0:
             self.current_trial['run_timeout'] = timeout
 
+        # overwrite benchmark configs
+        self.cb.params['robot_name'] = trial['robot']
+
         # set the generator function
         if generator is None:
             match GeneratorType(trial['generator']):
