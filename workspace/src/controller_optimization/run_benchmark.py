@@ -136,6 +136,28 @@ def run_evaluation():
     logger.info(f"Running evaluation on {WORK_DIR}.")
 
 
+def run_test():
+    global args, logger
+    logger.info("___ TEST ___")
+    try:
+        benchmark = ControllerBenchmark(logger, BENCHMARK_CONFIG_PATH)
+        benchmark.update_map()
+        # metric: ControllerMetric = benchmark.run_benchmark()
+
+        # init parameters
+        default_mppi_params = ControllerParameters()
+        default_mppi_params.load_from_yaml(DEFAULT_MPPI_PARAMS_PATH)
+        default_mppi_params.randomize_weights()
+
+        benchmark.update_parameters(default_mppi_params)
+
+    except Exception as e:
+        logger.error(e)
+        traceback.print_exc()
+    finally:
+        del benchmark
+
+
 def main():
     global args, logger
 
@@ -157,7 +179,7 @@ def main():
             run_evaluation()
             return 0
         else:
-            raise ValueError("Invalid run mode.")
+            run_test()
     except Exception as e:
         logger.error(e)
         traceback.print_exc()

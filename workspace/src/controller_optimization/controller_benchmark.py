@@ -269,7 +269,7 @@ class ControllerBenchmark:
                 f'{controller_name}.{critic.name}.cost_power': critic.cost_power
             })
 
-        params_set = self.param_manager.set_parameters(parameters.to_dict())
+        params_set = self.param_manager.set_parameters(critics_dict)
         if params_set is False:
             self.logger.error('Failed to set parameters')
             return False

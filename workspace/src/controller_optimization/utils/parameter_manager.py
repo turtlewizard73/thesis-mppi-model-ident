@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from rcl_interfaces.srv import GetParameters, SetParameters
-from rcl_interfaces.msg import Parameter, ParameterValue, ParameterType
+from rcl_interfaces.msg import Parameter, ParameterType, ParameterValue
 from typing import List, Optional, Dict, Any
 
 
@@ -14,14 +14,17 @@ class ParameterManager(Node):
         self.set_parameters_client = self.create_client(
             SetParameters, f"{target_node_name}/set_parameters")
 
+        for client in self.clients:
+            self.get_logger().info(f'Waiting for service {client.srv_name}')
+            success = client.wait_for_service(5.)
+            if not success:
+                self.get_logger().error(f'Timeout waiting for service {client.srv_name}')
+
         self.get_logger().info(f'ParameterManager for {target_node_name} initialized')
 
     def get_parameters(self, parameter_names: List[str]) -> Optional[List[Any]]:
         request = GetParameters.Request()
         request.names = parameter_names
-
-        while not self.get_parameters_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
 
         future = self.get_parameters_client.call_async(request)
         rclpy.spin_until_future_complete(self, future)
@@ -35,39 +38,40 @@ class ParameterManager(Node):
     def set_parameters(self, parameters: Dict[str, Any]) -> bool:
         self.get_logger().info(f'Setting parameters for {self.target_node_name}.')
 
-        request = SetParameters.Request()
+        # Prepare the request
+        params: List[Parameter] = []
         for name, value in parameters.items():
+            param = Parameter()
+            param.name = name
+
             if isinstance(value, bool):
-                param_value = ParameterValue(
+                param.value = ParameterValue(
                     type=ParameterType.PARAMETER_BOOL, bool_value=value)
             elif isinstance(value, int):
-                param_value = ParameterValue(
+                param.value = ParameterValue(
                     type=ParameterType.PARAMETER_INTEGER, integer_value=value)
             elif isinstance(value, float):
-                param_value = ParameterValue(
+                param.value = ParameterValue(
                     type=ParameterType.PARAMETER_DOUBLE, double_value=value)
             elif isinstance(value, str):
-                param_value = ParameterValue(
+                param.value = ParameterValue(
                     type=ParameterType.PARAMETER_STRING, string_value=value)
             else:
                 self.get_logger().error(f'Unsupported parameter type: {type(value)}')
                 return False
 
-            request.parameters.append(Parameter(name=name, value=param_value))
+            params.append(param)
 
-        # self.get_logger().debug(f'Parameters: {request.parameters}')
+            print(param)
 
-        while not self.set_parameters_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
+        req = SetParameters.Request(parameters=params)
+        res = self.set_parameters_client.call(req)
 
-        future = self.set_parameters_client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
-
-        if future.result() is not None:
-            self.get_logger().info('SetParameters was successful!')
-            return all(future.result().results)
+        if res.successful:
+            self.get_logger().info('Parameters set successfully')
+            return True
         else:
-            self.get_logger().error('SetParameters failed!')
+            self.get_logger().error('Failed to set parameters')
             return False
 
 # example usage
