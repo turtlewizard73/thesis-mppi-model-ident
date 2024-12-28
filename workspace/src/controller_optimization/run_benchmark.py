@@ -1,5 +1,9 @@
 #! /usr/bin/env python3
 
+import os
+import yaml
+import pandas as pd
+import pickle
 import traceback
 import argparse
 import matplotlib.pyplot as plt
@@ -125,6 +129,13 @@ def run_optimizer():
     del optimizer
 
 
+def run_evaluation():
+    global args, logger
+    WORK_DIR = args.evaluation
+    WORK_DIR = os.path.abspath(WORK_DIR)
+    logger.info(f"Running evaluation on {WORK_DIR}.")
+
+
 def main():
     global args, logger
 
@@ -135,18 +146,22 @@ def main():
     try:
         if args.benchmark is True:
             run_benchmark()
+            return 0
         elif args.plot_last is True:
             plot_last()
+            return 0
         elif args.optimizer is True:
             run_optimizer()
+            return 0
+        elif args.evaluation != '':
+            run_evaluation()
+            return 0
         else:
             raise ValueError("Invalid run mode.")
     except Exception as e:
         logger.error(e)
         traceback.print_exc()
         return 1
-    else:
-        return 0
 
 
 if __name__ == '__main__':

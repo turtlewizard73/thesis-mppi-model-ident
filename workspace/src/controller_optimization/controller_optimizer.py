@@ -192,6 +192,8 @@ class ControllerOptimizer:
         i = 1
         for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
             grid_space = np.arange(0, n, scale)
+            # load back the default parameters
+            self.test_params = deepcopy(self.reference_params)
             for v in grid_space:
                 self.test_params.set_critic_weight(critic, v)
                 self.cb.update_parameters(self.test_params)
