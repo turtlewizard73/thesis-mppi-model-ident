@@ -8,6 +8,7 @@ trials:
   - waffle_random
   - waffle_grid
   - waffle_bayesian
+  - enjoy_random_small
   - enjoy_random
   - enjoy_grid
   - enjoy_bayesian
