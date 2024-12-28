@@ -27,9 +27,9 @@ class TrialData:
     angle_to_goal_avg: float = 0.0
     angle_to_goal_std: float = 0.0
 
-    sum_of_costs: list = field(default_factory=list)
-    sum_of_costs_avg: float = 0.0
-    sum_of_costs_std: float = 0.0
+    avg_cost: list = field(default_factory=list)
+    avg_cost_avg: float = 0.0
+    avg_cost_std: float = 0.0
 
     # 2. Dynamics metrics
     avg_linear_velocity: list = field(default_factory=list)
@@ -70,8 +70,8 @@ class TrialData:
             ['Angle to Goal (avg)', self.angle_to_goal_avg, '[rad]'],
             ['Angle to Goal (std)', self.angle_to_goal_std, '[rad]'],
 
-            ['Sum of Costs (avg)', self.sum_of_costs_avg, '-'],
-            ['Sum of Costs (std)', self.sum_of_costs_std, '-'],
+            ['Avg of Costs (avg)', self.avg_cost_avg, '-'],
+            ['Avg of Costs (std)', self.avg_cost_std, '-'],
 
             ['Avg Linear Velocity (avg)', self.avg_linear_velocity_avg, '[m/s]'],
             ['Avg Linear Velocity (std)', self.avg_linear_velocity_std, '[m/s]'],

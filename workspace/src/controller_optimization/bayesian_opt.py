@@ -123,7 +123,7 @@ def main():
         benchmark_function,  # the function to minimize
         [(0.01, 100.0)] * 8,  # the bounds on each dimension of x
         acq_func="EI",  # the acquisition function
-        n_calls=1000,  # the number of evaluations of f
+        n_calls=800,  # the number of evaluations of f
         initial_point_generator="lhs",
         n_random_starts=50,  # the number of random initialization points
         noise=0.1**2,  # the noise level (optional)

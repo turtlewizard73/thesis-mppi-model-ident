@@ -11,6 +11,7 @@ trials:
   - enjoy_random
   - enjoy_grid
   - enjoy_bayesian
+  - bayes_test
 test_trial:
   map: complex_ref
   robot: waffle
@@ -66,6 +67,13 @@ waffle_grid:  # running in ws sim 73
   generator: grid
   score_method: default
   runs: 808
+  run_timeout: 60
+bayes_test:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian
+  score_method: default
+  runs: 10
   run_timeout: 60
 waffle_bayesian:
   map: complex_ref

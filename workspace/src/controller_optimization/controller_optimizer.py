@@ -10,6 +10,12 @@ import numpy as np
 import pandas as pd
 import traceback
 
+# bayesian stuff
+from skopt import Optimizer
+from skopt import gp_minimize
+from skopt.space import Real
+from skopt.utils import use_named_args
+
 import constants
 from utils.util_functions import timing_decorator
 from utils.controller_parameters import ControllerParameters
@@ -148,6 +154,8 @@ class ControllerOptimizer:
                     self.generator = self.generator_random
                 case GeneratorType.GRID:
                     self.generator = self.generator_grid
+                case GeneratorType.BAYESIAN:
+                    self.generator = self.generator_bayesian
                 case _:
                     raise ValueError(f"Invalid generator type: {trial['generator']}")
         else:
@@ -155,6 +163,7 @@ class ControllerOptimizer:
             self.generator = generator
 
         # set score function
+        self.current_score = 0.0
         if score_method is None:
             match trial['score_method']:
                 case 'default':
@@ -202,6 +211,28 @@ class ControllerOptimizer:
                 self.cb.update_parameters(self.test_params)
                 yield i
                 i += 1
+
+    def generator_bayesian(self):
+        space = [Real(0.0, 100.0, name=critic)
+                 for critic in constants.DEFAULT_MPPI_CRITIC_NAMES]
+        optimizer = Optimizer(dimensions=space, random_state=0)
+
+        n = self.current_trial['runs']
+        for i in range(1, n + 1):
+            # suggest new parameters using the Optimizer
+            suggested = optimizer.ask()
+            suggested_params = {dim.name: val for dim, val in zip(space, suggested)}
+
+            # update params
+            for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+                self.test_params.set_critic_weight(critic, suggested_params[critic])
+            self.cb.update_parameters(self.test_params)
+
+            # simulate a score using the suggested parameters
+            yield i
+
+            # tell the optimizer the result of the evaluation
+            optimizer.tell(suggested, self.current_score)
 
     def score_default(self, metric: ControllerMetric) -> float:
         # smaller is better
@@ -280,6 +311,7 @@ class ControllerOptimizer:
         self.reference_metric = metric
         self.reference_metric_path = self.cb.save_metric(self.reference_metric)
         self.reference_score = self.score_method(self.reference_metric)
+        self.current_score = self.reference_score
 
         ref_run_result = RunResult(
             id='reference',
@@ -341,6 +373,7 @@ class ControllerOptimizer:
                 successful_trials += 1
 
                 score = run_result['score']
+                self.current_score = score
                 self.logger.info(f"Trial {i}/{num_trials} finished with score: {score}")
                 if run_result['score'] < best_score:
                     best_score = score
