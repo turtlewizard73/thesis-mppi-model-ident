@@ -62,17 +62,16 @@ class ParameterManager(Node):
 
             params.append(param)
 
-            print(param)
-
         req = SetParameters.Request(parameters=params)
         res = self.set_parameters_client.call(req)
 
-        if res.successful:
-            self.get_logger().info('Parameters set successfully')
-            return True
-        else:
+        if res is None:
             self.get_logger().error('Failed to set parameters')
             return False
+        else:
+            self.get_logger().info('Parameters set successfully')
+            return all([r.successful for r in res.results])
+
 
 # example usage
 # rclpy.init()

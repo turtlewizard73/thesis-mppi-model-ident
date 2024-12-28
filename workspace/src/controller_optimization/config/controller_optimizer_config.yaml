@@ -24,7 +24,7 @@ test_random:
   robot: waffle
   generator: random
   score_method: default
-  runs: 2
+  runs: 5
   run_timeout: 60
 default_distribution:  # ran on local default_distribution_2024-11-24_13-23-28
   map: complex_ref  # without local
