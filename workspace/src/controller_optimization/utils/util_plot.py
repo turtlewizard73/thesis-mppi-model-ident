@@ -7,8 +7,13 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots
+from tabulate import tabulate
 
-colors = ['blue', 'salmon', 'green', 'purple', 'orange']
+default_colors = [
+    "#1e5167", "#6ab6c7", "#95265c", "#5ab220", "#c86be1",
+    "#20f53d", "#e028e5", "#c9dd87", "#4224bf", "#10eddc"]
+
+FIGSIZE = (6, 4)
 
 
 def eval_trial_data(trial_folder: str) -> TrialData:
@@ -89,55 +94,79 @@ def eval_trial_data(trial_folder: str) -> TrialData:
     return td
 
 
-def plot_time_frechet(trial_datas: dict[str, TrialData]) -> plt.Figure:
+def plot_time_frechet(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     labels = list(trial_datas.keys())
+
     run_time_avg = [t.run_time_avg for t in trial_datas.values()]
     run_time_std = [t.run_time_std for t in trial_datas.values()]
+
+    x = np.arange(len(labels))
+    width = 0.25  # bar width
+    fig, ax_time = plt.subplots(num='Run time and Frechet distance', figsize=FIGSIZE)
+    bars_time = ax_time.bar(
+        x, run_time_avg, width, yerr=run_time_std,
+        capsize=5, label='Run Time', color=colors[0])
+    ax_time.set_ylabel('Run Time [s]')
+    ax_time.tick_params(axis='y')
 
     frechet_distance_avg = [t.frechet_distance_avg for t in trial_datas.values()]
     frechet_distance_std = [t.frechet_distance_std for t in trial_datas.values()]
 
-    x = np.arange(len(labels))
-    width = 0.25  # bar width
-    fig, ax_time = plt.subplots(num='Run time and Frechet distance')
-    bars_time = ax_time.bar(
-        x, run_time_avg, width, yerr=run_time_std, capsize=5, label='Run Time')
-    ax_time.set_ylabel('Run Time [s]')
-    ax_time.tick_params(axis='y')
-
     ax_frechet = ax_time.twinx()
     bars_frechet = ax_frechet.bar(
         x + width, frechet_distance_avg, width, yerr=frechet_distance_std,
-        capsize=5, label='Frechet Distance',
-        color='salmon')
-    ax_frechet.set_ylabel('Run Time [s]')
+        capsize=5, label='Frechet Distance', color=colors[1])
+    ax_frechet.set_ylabel('Frechet Distance [m]')
     ax_frechet.tick_params(axis='y')
 
-    ax_time.set_title('Run Time and Frechet Distance')
-    ax_time.set_xticks(x + width / 2)
+    avg_cost_avg = [t.avg_cost_avg for t in trial_datas.values()]
+    avg_cost_std = [t.avg_cost_std for t in trial_datas.values()]
+    ax_cost = ax_time.twinx()
+    ax_cost.spines['right'].set_position(('outward', 60))  # Offset the third axis
+    bars_cost = ax_cost.bar(
+        x + 2 * width, avg_cost_avg, width, yerr=avg_cost_std,
+        capsize=5, label='Average Cost', color=colors[2])
+    ax_cost.set_ylabel('Average Cost [-]')
+    ax_cost.tick_params(axis='y')
+
+    # ax_time.set_title('Run Time and Frechet Distance')
+    ax_time.set_xticks(x + width)
     ax_time.set_xticklabels(labels)
-    fig.legend(loc='lower left', ncol=2)
+    fig.legend(loc=(0.1, 0), ncol=3)
 
-    for bars, avg, std in zip(bars_time, run_time_avg, run_time_std):
-        ax_time.annotate(
-            f'{avg:.2f} \u00B1 {std:.3f} [s]',
-            xy=(bars.get_x() + bars.get_width() / 2, avg),
-            xytext=(0, 3),  # 3 points vertical offset
-            textcoords='offset points',
-            ha='center', va='bottom')
+    # for bars, avg, std in zip(bars_time, run_time_avg, run_time_std):
+    #     ax_time.annotate(
+    #         f'{avg:.2f} ± {std:.3f} [s]',
+    #         xy=(bars.get_x() + bars.get_width() / 2, avg),
+    #         xytext=(0, 3),  # 3 points vertical offset
+    #         textcoords='offset points',
+    #         ha='center', va='bottom')
 
-    for bars, avg, std in zip(bars_frechet, frechet_distance_avg, frechet_distance_std):
-        ax_frechet.annotate(
-            f'{avg:.2f} \u00B1 {std:.3f} [m]',
-            xy=(bars.get_x() + bars.get_width() / 2, avg),
-            xytext=(0, 3),  # 3 points vertical offset
-            textcoords='offset points',
-            ha='center', va='bottom')
+    # for bars, avg, std in zip(bars_frechet, frechet_distance_avg, frechet_distance_std):
+    #     ax_frechet.annotate(
+    #         f'{avg:.2f} ± {std:.3f} [m]',
+    #         xy=(bars.get_x() + bars.get_width() / 2, avg),
+    #         xytext=(0, 3),  # 3 points vertical offset
+    #         textcoords='offset points',
+    #         ha='center', va='bottom')
+
+    # Print results in a tabular format
+    table_data = [
+        [
+            labels[i],
+            f"{run_time_avg[i]:.2f} ± {run_time_std[i]:.3f}",
+            f"{frechet_distance_avg[i]:.2f} ± {frechet_distance_std[i]:.3f}",
+            f"{avg_cost_avg[i]:.2f} ± {avg_cost_std[i]:.3f}"
+        ]
+        for i in range(len(labels))
+    ]
+    table_headers = ["Label", "Run Time [s]", "Frechet Distance [m]", "Average Cost [-]"]
+    print(tabulate(table_data, headers=table_headers, tablefmt="grid"))
 
     return fig
 
 
-def plot_distance_angle(trial_datas: dict[str, TrialData]) -> plt.Figure:
+def plot_distance_angle(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     labels = list(trial_datas.keys())
     distance_to_goal_avg = [t.distance_to_goal_avg for t in trial_datas.values()]
     distance_to_goal_std = [t.distance_to_goal_std for t in trial_datas.values()]
@@ -147,10 +176,10 @@ def plot_distance_angle(trial_datas: dict[str, TrialData]) -> plt.Figure:
 
     x = np.arange(len(labels))
     width = 0.25  # bar width
-    fig, ax_distance = plt.subplots(num='Distance and Angle to Goal')
+    fig, ax_distance = plt.subplots(num='Distance and Angle to Goal', figsize=FIGSIZE)
     bars_distance = ax_distance.bar(
         x, distance_to_goal_avg, width, yerr=distance_to_goal_std,
-        capsize=5, label='Distance to Goal')
+        capsize=5, label='Distance to Goal', color=colors[:len(labels)])
     ax_distance.set_ylabel('Distance to Goal [m]')
     ax_distance.tick_params(axis='y')
 
@@ -162,14 +191,14 @@ def plot_distance_angle(trial_datas: dict[str, TrialData]) -> plt.Figure:
     ax_angle.set_ylabel('Angle to Goal [rad]')
     ax_angle.tick_params(axis='y')
 
-    ax_distance.set_title('Distance and Angle to Goal')
+    # ax_distance.set_title('Distance and Angle to Goal')
     ax_distance.set_xticks(x + width / 2)
     ax_distance.set_xticklabels(labels)
     fig.legend(loc='lower left', ncol=2)
 
     for bars, avg, std in zip(bars_distance, distance_to_goal_avg, distance_to_goal_std):
         ax_distance.annotate(
-            f'{avg:.2f} \u00B1 {std:.3f} [m]',
+            f'{avg:.2f} ± {std:.3f} [m]',
             xy=(bars.get_x() + bars.get_width() / 2, avg),
             xytext=(0, 3),  # 3 points vertical offset
             textcoords='offset points',
@@ -177,7 +206,7 @@ def plot_distance_angle(trial_datas: dict[str, TrialData]) -> plt.Figure:
 
     for bars, avg, std in zip(bars_angle, angle_to_goal_avg, angle_to_goal_std):
         ax_angle.annotate(
-            f'{avg:.2f} \u00B1 {std:.3f} [rad]',
+            f'{avg:.2f} ± {std:.3f} [rad]',
             xy=(bars.get_x() + bars.get_width() / 2, avg),
             xytext=(0, 3),  # 3 points vertical offset
             textcoords='offset points',
@@ -186,7 +215,7 @@ def plot_distance_angle(trial_datas: dict[str, TrialData]) -> plt.Figure:
     return fig
 
 
-def plot_rms(trial_datas: dict[str, TrialData]) -> plt.Figure:
+def plot_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     labels = list(trial_datas.keys())
     rms_linear_jerk_avg = [t.rms_linear_jerk_avg for t in trial_datas.values()]
     rms_linear_jerk_std = [t.rms_linear_jerk_std for t in trial_datas.values()]
@@ -196,10 +225,10 @@ def plot_rms(trial_datas: dict[str, TrialData]) -> plt.Figure:
 
     x = np.arange(len(labels))
     width = 0.25  # bar width
-    fig, ax_linear = plt.subplots(num='RMS Linear and Angular Jerk')
+    fig, ax_linear = plt.subplots(num='RMS Linear and Angular Jerk', figsize=FIGSIZE)
     bars_linear = ax_linear.bar(
         x, rms_linear_jerk_avg, width, yerr=rms_linear_jerk_std,
-        capsize=5, label='RMS Linear Jerk')
+        capsize=5, label='RMS Linear Jerk', color=colors[:len(labels)])
     ax_linear.set_ylabel('RMS Linear Jerk [m/s^3]')
     ax_linear.tick_params(axis='y')
 
@@ -211,14 +240,14 @@ def plot_rms(trial_datas: dict[str, TrialData]) -> plt.Figure:
     ax_angular.set_ylabel('RMS Angular Jerk [rad/s^3]')
     ax_angular.tick_params(axis='y')
 
-    ax_linear.set_title('RMS Linear and Angular Jerk')
+    # ax_linear.set_title('RMS Linear and Angular Jerk')
     ax_linear.set_xticks(x + width / 2)
     ax_linear.set_xticklabels(labels)
     fig.legend(loc='lower left', ncol=2)
 
     for bars, avg, std in zip(bars_linear, rms_linear_jerk_avg, rms_linear_jerk_std):
         ax_linear.annotate(
-            f'{avg:.2f} \u00B1 {std:.3f} [m/s^3]',
+            f'{avg:.2f} ± {std:.3f} [m/s^3]',
             xy=(bars.get_x() + bars.get_width() / 2, avg),
             xytext=(0, 3),  # 3 points vertical offset
             textcoords='offset points',
@@ -226,7 +255,7 @@ def plot_rms(trial_datas: dict[str, TrialData]) -> plt.Figure:
 
     for bars, avg, std in zip(bars_angular, rms_angular_jerk_avg, rms_angular_jerk_std):
         ax_angular.annotate(
-            f'{avg:.2f} \u00B1 {std:.3f} [rad/s^3]',
+            f'{avg:.2f} ± {std:.3f} [rad/s^3]',
             xy=(bars.get_x() + bars.get_width() / 2, avg),
             xytext=(0, 3),  # 3 points vertical offset
             textcoords='offset points',
@@ -235,32 +264,10 @@ def plot_rms(trial_datas: dict[str, TrialData]) -> plt.Figure:
     return fig
 
 
-def plot_avg_cost(trial_datas: dict[str, TrialData]) -> plt.Figure:
-    labels = list(trial_datas.keys())
-    avg_cost_avg = [t.avg_cost_avg for t in trial_datas.values()]
-    avg_cost_std = [t.avg_cost_std for t in trial_datas.values()]
-
-    x = np.arange(len(labels))
-    width = 0.25  # bar width
-    fig, ax_cost = plt.subplots(num='Average Cost')
-    bars_cost = ax_cost.bar(
-        x, avg_cost_avg, width, yerr=avg_cost_std,
-        capsize=5, label='Average Cost')
-    ax_cost.set_ylabel('Average Cost [-]')
-    ax_cost.tick_params(axis='y')
-
-    ax_cost.set_title('Average Cost')
-    ax_cost.set_xticks(x)
-    ax_cost.set_xticklabels(labels)
-    fig.legend(loc='lower left', ncol=2)
-
-    return fig
-
-
-def scatter_time_frechet(trial_datas: dict[str, TrialData]) -> plt.Figure:
+def scatter_time_frechet(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     labels = list(trial_datas.keys())
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(num='Scatter Run Time vs Frechet', figsize=FIGSIZE)
     for i, trial in enumerate(trial_datas.values()):
         x = trial.run_time
         y = trial.frechet_distance
@@ -274,10 +281,10 @@ def scatter_time_frechet(trial_datas: dict[str, TrialData]) -> plt.Figure:
     return fig
 
 
-def scatter_distance_angle(trial_datas: dict[str, TrialData]) -> plt.Figure:
+def scatter_distance_angle(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     labels = list(trial_datas.keys())
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(num='Scatter Distance to Goal vs Angle to Goal', figsize=FIGSIZE)
     for i, trial in enumerate(trial_datas.values()):
         x = trial.distance_to_goal
         y = trial.angle_to_goal
@@ -291,10 +298,10 @@ def scatter_distance_angle(trial_datas: dict[str, TrialData]) -> plt.Figure:
     return fig
 
 
-def scatter_rms(trial_datas: dict[str, TrialData]) -> plt.Figure:
+def scatter_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     labels = list(trial_datas.keys())
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(num='Scatter RMS Linear Jerk vs RMS Angular Jerk', figsize=FIGSIZE)
     for i, trial in enumerate(trial_datas.values()):
         x = trial.rms_linear_jerk
         y = trial.rms_angular_jerk

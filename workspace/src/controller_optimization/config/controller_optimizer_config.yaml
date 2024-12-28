@@ -59,7 +59,7 @@ waffle_random:  # running in ws sim 72
   robot: waffle
   generator: random
   score_method: default
-  runs: 400
+  runs: 500
   run_timeout: 60
 waffle_grid:  # running in ws sim 73
   map: complex_ref
@@ -82,12 +82,19 @@ waffle_bayesian:
   score_method: default
   runs: 100
   run_timeout: 60
+enjoy_random_small:
+  map: complex_ref
+  robot: enjoy
+  generator: random
+  score_method: default
+  runs: 100
+  run_timeout: 60
 enjoy_random:
   map: complex_ref
   robot: enjoy
   generator: random
   score_method: default
-  runs: 400
+  runs: 500
   run_timeout: 60
 enjoy_grid:
   map: complex_ref

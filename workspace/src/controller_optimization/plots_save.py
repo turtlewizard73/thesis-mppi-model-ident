@@ -6,18 +6,28 @@ from utils.util_plot import (
     eval_trial_data,
     plot_time_frechet,
     plot_distance_angle,
-    plot_rms, plot_avg_cost,
+    plot_rms,
     scatter_time_frechet, scatter_distance_angle, scatter_rms)
 
 # __________ CONFIG __________
 WORK_DIR = '/home/turtlewizard/repos/thesis-mppi-model-ident/optimization_results'
 
 DOCS_PATH = '/home/turtlewizard/repos/thesis-mppi-model-ident/msc-docs'
-SAVE_PATH = os.path.join(DOCS_PATH, 'figures')
+SAVE_PATH = os.path.join(DOCS_PATH, 'plots')
+if not os.path.exists(SAVE_PATH):
+    os.makedirs(SAVE_PATH)
+
 # first 4 ok
 colors = [
     "#1e5167", "#6ab6c7", "#95265c", "#5ab220", "#c86be1",
     "#20f53d", "#e028e5", "#c9dd87", "#4224bf", "#10eddc"]
+
+# https://github.com/garrettj403/SciencePlots/blob/master/examples/plot-examples.py
+CONTEXT_SCIENCE = plt.style.context(['science'])
+CONTEXT_SCIENCE_GRID = plt.style.context(['science', 'grid'])
+CONTEXT_SCATTER = plt.style.context(['science', 'scatter'])
+
+ctxs = [CONTEXT_SCIENCE, CONTEXT_SCIENCE_GRID, CONTEXT_SCATTER]
 
 # __________ DISTRIBUTION TRIALS __________
 waffle_std_path = WORK_DIR + '/default_distribution_2024-11-24_13-23-28'
@@ -51,3 +61,8 @@ trial_datas_rand = {
 }
 
 # __________ PLOT TIME FRECHET __________
+with CONTEXT_SCIENCE:
+    fig_std_time = plot_time_frechet(trial_datas_std, colors)
+    fig_std_time.savefig(
+        os.path.join(SAVE_PATH, 'std_time_frechet_cost.pdf'),
+        dpi=300)
