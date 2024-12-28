@@ -80,7 +80,7 @@ waffle_bayesian:
   robot: waffle
   generator: bayesian
   score_method: default
-  runs: 500
+  runs: 100
   run_timeout: 60
 enjoy_random:
   map: complex_ref
