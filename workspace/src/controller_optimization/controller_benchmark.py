@@ -277,7 +277,7 @@ class ControllerBenchmark:
         self.current_controller_params = parameters
         return True
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Launching nodes...'),
         lambda self, ex_time: self.logger.info(f'Launched nodes in {ex_time:.4f} seconds.'))
     def launch_nodes(self):
@@ -323,7 +323,7 @@ class ControllerBenchmark:
             if 'sub' in name:
                 node.collect_data = False
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Stopping nodes, sub executors, threads...'),
         lambda self, ex_time: self.logger.info(f'Stopped nodes in {ex_time:.4f} seconds.'))
     def stop_nodes(self):
@@ -353,7 +353,7 @@ class ControllerBenchmark:
         except Exception as e:
             raise RuntimeError(f'Failed to stop nodes: {e}') from e
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.debug('Checking if nodes are active...'),
         lambda self, ex_time: self.logger.debug(f'Checked nodes in {ex_time:.4f} seconds.')
     )
@@ -400,7 +400,7 @@ class ControllerBenchmark:
 
         return True, 'All nodes are active'
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
     def run_benchmark(
@@ -825,7 +825,7 @@ class ControllerBenchmark:
         return tabulate(
             table_data, headers=["Attribute", "Value", "Unit"], tablefmt="grid", floatfmt='.4f')
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Plotting metric...'),
         lambda self, ex_time: self.logger.info(f'Plotted metric in {ex_time:.4f} seconds.')
     )
