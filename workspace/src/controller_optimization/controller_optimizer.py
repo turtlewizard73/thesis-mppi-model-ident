@@ -165,9 +165,16 @@ class ControllerOptimizer:
         # set score function
         self.current_score = 0.0
         if score_method is None:
+            self.logger.info(f'Using score method: {trial["score_method"]}')
             match trial['score_method']:
                 case 'default':
                     self.score_method = self.score_default
+                case 'frechet':
+                    self.score_method = self.score_frechet
+                case 'time':
+                    self.score_method = self.score_time
+                case 'jerk':
+                    self.score_method = self.score_jerk
                 case _:
                     raise ValueError(f"Invalid score method: {trial['score_method']}")
         else:
@@ -202,8 +209,9 @@ class ControllerOptimizer:
         scale = 1
         # generate grid and update the controller benchmark
         i = 1
+        grid_space = np.arange(0, n, scale)
+
         for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
-            grid_space = np.arange(0, n, scale)
             # load back the default parameters
             self.test_params = deepcopy(self.reference_params)
             for v in grid_space:
@@ -263,6 +271,26 @@ class ControllerOptimizer:
 
         return float(score)
 
+    def score_frechet(self, metric: ControllerMetric) -> float:
+        max_distance = np.linalg.norm(metric.path_xy[-1] - metric.path_xy[0]) / 2
+        normalized_frechet_distance = metric.frechet_distance / max_distance
+
+        return float(normalized_frechet_distance)
+
+    def score_time(self, metric: ControllerMetric) -> float:
+        max_time = 60.0
+        normalized_time_elapsed = metric.time_elapsed / max_time
+
+        return float(normalized_time_elapsed)
+
+    def score_jerk(self, metric: ControllerMetric) -> float:
+        max_linear_jerk = 1.0
+        max_angular_jerk = 5.0
+        normalized_rms_linear_jerk = metric.rms_linear_jerk / max_linear_jerk
+        normalized_rms_angular_jerk = metric.rms_angular_jerk / max_angular_jerk
+
+        return float(normalized_rms_linear_jerk + normalized_rms_angular_jerk)
+
     def _run(self, run_uid: str):
         metric = self.cb.run_benchmark(run_uid=run_uid)
 
@@ -282,6 +310,7 @@ class ControllerOptimizer:
             success=True,
             time_elapsed=metric.time_elapsed,
             score=score,
+            frechet_distance=metric.frechet_distance,
             distance_to_goal=metric.distance_to_goal,
             angle_to_goal=metric.angle_to_goal,
             avg_cost=metric.avg_cost,
@@ -318,6 +347,7 @@ class ControllerOptimizer:
             success=True,
             time_elapsed=metric.time_elapsed,
             score=self.reference_score,
+            frechet_distance=self.reference_metric.frechet_distance,
             distance_to_goal=self.reference_metric.distance_to_goal,
             angle_to_goal=self.reference_metric.angle_to_goal,
             avg_cost=self.reference_metric.avg_cost,
@@ -368,6 +398,7 @@ class ControllerOptimizer:
                 run_result: RunResult = self._run(i)
                 if run_result['success'] is False:
                     self.logger.warn(f"Failed to run trial {i}/{num_trials}")
+                    # TODO: log this also
                     continue
 
                 successful_trials += 1

@@ -6,6 +6,9 @@ import pandas as pd
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
+from itertools import cycle
+
+
 import scienceplots
 from tabulate import tabulate
 
@@ -350,3 +353,70 @@ def scatter_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt
     ax.legend()
 
     return fig
+
+
+def eval_grid(trial_folder: str, critic_list: list[str], colors=default_colors) -> plt.Figure:
+    if not os.path.isdir(trial_folder):
+        print(f"Invalid directory: {trial_folder}")
+        return None
+
+    # Read the summary.yaml file
+    summary_path = os.path.join(trial_folder, 'summary.yaml')
+    if not os.path.exists(summary_path):
+        print(f"Summary file not found: {summary_path}")
+        return None
+
+    with open(summary_path, 'r') as file:
+        summary = yaml.safe_load(file)
+        print(f"___ Processing {trial_folder} ___")
+        print(f"RUN NAME: {summary['name']}")
+        print(f"Runs/successful: {summary['runs']}/{summary['successful_trials']}")
+        print(f"Whole run time: {summary['loop_time'] / 60:.2f} [mins]")
+
+    # Prepare the plot
+    stuff_to_plot = [
+        'time_elapsed',
+        'score',
+        'distance_to_goal',
+        'angle_to_goal',
+        'avg_cost',
+        'rms_linear_jerk',
+        'rms_angular_jerk',
+    ]
+
+    figures = []
+    for metric in stuff_to_plot:
+        print(f"Plotting {metric}")
+
+        fig, ax = plt.subplots(num=f'Grid of {metric}', figsize=FIGSIZE)
+        color_cycle = cycle(colors)
+        labels = []
+
+        for critic in critic_list:
+            path = os.path.join(trial_folder, f'{critic}.csv')
+
+            if not os.path.exists(path):
+                print(f"File not found: {path}")
+                continue
+
+            df = pd.read_csv(path)
+
+            if f'{critic}.cost_weight' not in df or metric not in df:
+                print(f"Missing required columns in {path}")
+                continue
+
+            ax.plot(
+                df[f'{critic}.cost_weight'],
+                df[metric],
+                label=critic,
+                color=next(color_cycle)
+            )
+            labels.append(critic)
+
+        ax.set_xlabel("Cost Weight")
+        ax.set_ylabel(metric)
+        ax.set_title("Grid Evaluation")
+        ax.legend(title="Critics")
+
+        figures.append(fig)
+    return figures

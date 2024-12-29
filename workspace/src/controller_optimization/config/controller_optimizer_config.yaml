@@ -127,3 +127,24 @@ enjoy_bayesian_big:
   score_method: default
   runs: 500
   run_timeout: 60
+waffle_bayes_f:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian
+  score_method: frechet
+  runs: 100
+  run_timeout: 60
+waffle_bayes_time:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian
+  score_method: time
+  runs: 100
+  run_timeout: 60
+waffle_bayes_jerk:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian
+  score_method: jerk
+  runs: 100
+  run_timeout: 60

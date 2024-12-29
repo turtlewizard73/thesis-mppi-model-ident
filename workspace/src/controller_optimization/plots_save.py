@@ -75,9 +75,9 @@ waffle_grid_data = eval_trial_data(waffle_grid_path)
 
 # __________ BAYESIAN __________
 waffle_bayesian100_path = WORK_DIR + '/waffle_bayesian_2024-12-28_15-47-40'
-waffle_bayesian500_path = WORK_DIR + ''
+waffle_bayesian500_path = WORK_DIR + ''  # FUT
 enjoy_bayesian100_path = WORK_DIR + ''
-enjoy_bayesian500_path = WORK_DIR + ''
+enjoy_bayesian500_path = WORK_DIR + ''  # FUT
 
 
 # __________ PLOT DEFAULT DISTRIBUTION  __________
