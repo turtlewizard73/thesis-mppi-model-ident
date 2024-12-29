@@ -242,6 +242,11 @@ class ControllerOptimizer:
             # tell the optimizer the result of the evaluation
             optimizer.tell(suggested, self.current_score)
 
+    # def generator_map(self):
+    #     MAPS_PATH = '/home/turtlewizard/thesis-mppi-model-ident/workspace/src/controller_optimization/maps/maps_seq'
+
+    #     self.cb.changeLocalMap()
+
     def score_default(self, metric: ControllerMetric) -> float:
         # smaller is better
         max_time = 60.0
