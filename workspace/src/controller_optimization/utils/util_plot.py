@@ -1,5 +1,3 @@
-from utils.util_functions import calculate_avg_std
-from utils.trial_data import TrialData
 import os
 import yaml
 import pandas as pd
@@ -8,15 +6,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from itertools import cycle
 
-
 import scienceplots
 from tabulate import tabulate
 
+from utils.trial_data import TrialData
+from utils.util_functions import calculate_avg_std
+
+FIGSIZE = (6, 4)
+ms3 = r'$m/s^3$'
+rads3 = r'$rad/s^3$'
 default_colors = [
     "#1e5167", "#6ab6c7", "#95265c", "#5ab220", "#c86be1",
     "#20f53d", "#e028e5", "#c9dd87", "#4224bf", "#10eddc"]
-
-FIGSIZE = (6, 4)
 
 
 def eval_trial_data(trial_folder: str) -> TrialData:
@@ -55,7 +56,7 @@ def eval_trial_data(trial_folder: str) -> TrialData:
             continue
 
         with open(metric_path, 'rb') as file:
-            m = pickle.load(file)
+            m: ControllerMetric = pickle.load(file)
 
         td.run_time.append(m.time_elapsed)
         td.frechet_distance.append(m.frechet_distance)
@@ -244,23 +245,23 @@ def plot_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Fi
     rms_linear_jerk_avg = [t.rms_linear_jerk_avg for t in trial_datas.values()]
     rms_linear_jerk_std = [t.rms_linear_jerk_std for t in trial_datas.values()]
 
-    rms_angular_jerk_avg = [t.rms_angular_jerk_avg for t in trial_datas.values()]
-    rms_angular_jerk_std = [t.rms_angular_jerk_std for t in trial_datas.values()]
-
     x = np.arange(len(labels))
     width = 0.25  # bar width
     fig, ax_linear = plt.subplots(num='RMS Linear and Angular Jerk', figsize=FIGSIZE)
     bars_linear = ax_linear.bar(
         x, rms_linear_jerk_avg, width, yerr=rms_linear_jerk_std,
         capsize=5, label='RMS linear jerk', color=colors[0])
-    ax_linear.set_ylabel('RMS linear jerk [m/s^3]')
+    ax_linear.set_ylabel(f'RMS linear jerk [{ms3}]')
     ax_linear.tick_params(axis='y')
+
+    rms_angular_jerk_avg = [t.rms_angular_jerk_avg for t in trial_datas.values()]
+    rms_angular_jerk_std = [t.rms_angular_jerk_std for t in trial_datas.values()]
 
     ax_angular = ax_linear.twinx()
     bars_angular = ax_angular.bar(
         x + width, rms_angular_jerk_avg, width, yerr=rms_angular_jerk_std,
         capsize=5, label='RMS angular jerk', color=colors[1])
-    ax_angular.set_ylabel('RMS angular jerk [rad/s^3]')
+    ax_angular.set_ylabel(f'RMS angular jerk [{rads3}]')
     ax_angular.tick_params(axis='y')
 
     # ax_linear.set_title('RMS Linear and Angular Jerk')
@@ -315,7 +316,7 @@ def scatter_time_frechet(trial_datas: dict[str, TrialData], colors=default_color
 
     ax.set_xlabel('Run Time [s]')
     ax.set_ylabel('Frechet Distance [m]')
-    ax.set_title('Scatter Plot of Run Time vs Frechet Distance')
+    # ax.set_title('Scatter Plot of Run Time vs Frechet Distance')
     ax.legend()
 
     return fig
@@ -332,7 +333,7 @@ def scatter_distance_angle(trial_datas: dict[str, TrialData], colors=default_col
 
     ax.set_xlabel('Distance to Goal [m]')
     ax.set_ylabel('Angle to Goal [rad]')
-    ax.set_title('Scatter Plot of Distance to Goal vs Angle to Goal')
+    # ax.set_title('Scatter Plot of Distance to Goal vs Angle to Goal')
     ax.legend()
 
     return fig
@@ -347,9 +348,9 @@ def scatter_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt
         y = trial.rms_angular_jerk
         ax.scatter(x, y, label=labels[i], color=colors[i + 1], alpha=0.5, edgecolors='none')
 
-    ax.set_xlabel('RMS Linear Jerk [m/s^3]')
-    ax.set_ylabel('RMS Angular Jerk [rad/s^3]')
-    ax.set_title('Scatter Plot of RMS Linear Jerk vs RMS Angular Jerk')
+    ax.set_xlabel(f'RMS Linear Jerk [{ms3}]')
+    ax.set_ylabel(f'RMS Angular Jerk [{rads3}]')
+    # ax.set_title('Scatter Plot of RMS Linear Jerk vs RMS Angular Jerk')
     ax.legend()
 
     return fig
@@ -384,6 +385,16 @@ def eval_grid(trial_folder: str, critic_list: list[str], colors=default_colors) 
         'rms_angular_jerk',
     ]
 
+    ylabels = {
+        'time_elapsed': 'Time elapsed [s]',
+        'score': 'Score [-]',
+        'distance_to_goal': 'Distance to goal [m]',
+        'angle_to_goal': 'Angle to goal [rad]',
+        'avg_cost': 'Average cost [-]',
+        'rms_linear_jerk': f'RMS linear jerk [{ms3}]',
+        'rms_angular_jerk': f'RMS angular jerk [{rads3}]',
+    }
+
     figures = []
     for metric in stuff_to_plot:
         print(f"Plotting {metric}")
@@ -414,9 +425,46 @@ def eval_grid(trial_folder: str, critic_list: list[str], colors=default_colors) 
             labels.append(critic)
 
         ax.set_xlabel("Cost Weight")
-        ax.set_ylabel(metric)
-        ax.set_title("Grid Evaluation")
-        ax.legend(title="Critics")
+        ax.set_ylabel(ylabels[metric])
+        # ax.set_title("Grid Evaluation")
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
         figures.append(fig)
+    return figures
+
+
+def plot_bayes(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
+    stuff_to_plot = [
+        'score',
+        'distance_to_goal',
+        'angle_to_goal',
+        'avg_cost',
+        'rms_linear_jerk',
+        'rms_angular_jerk',
+    ]
+
+    ylabels = {
+        'score': 'Score [-]',
+        'distance_to_goal': 'Distance to goal [m]',
+        'angle_to_goal': 'Angle to goal [rad]',
+        'avg_cost': 'Average cost [-]',
+        'rms_linear_jerk': f'RMS linear jerk [{ms3}]',
+        'rms_angular_jerk': f'RMS angular jerk [{rads3}]',
+    }
+
+    figures = []
+    for metric in stuff_to_plot:
+        fig, ax = plt.subplots(num=f'Bayesian optimization: {metric}', figsize=FIGSIZE)
+
+        for i, (name, data) in enumerate(trial_datas.items()):
+            id_ints = np.arange(len(data['id']))
+            ax.plot(id_ints, data[metric], label=name, color=colors[i])
+
+        # ax.set_title(metric)
+        ax.set_xlabel('iteration')
+        ax.set_ylabel(ylabels[metric])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        figures.append(fig)
+
     return figures
