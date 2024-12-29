@@ -15,6 +15,9 @@ trials:
   - bayes_test
   - waffle_bayesian_big
   - enjoy_bayesian_big
+  - waffle_bayes_f
+  - waffle_bayes_time
+  - waffle_bayes_jerk
 test_trial:
   map: complex_ref
   robot: waffle
