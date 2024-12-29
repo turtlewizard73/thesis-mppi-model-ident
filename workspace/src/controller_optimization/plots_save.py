@@ -22,6 +22,8 @@ colors = [
     "#1e5167", "#6ab6c7", "#95265c", "#5ab220", "#c86be1",
     "#20f53d", "#e028e5", "#c9dd87", "#4224bf", "#10eddc"]
 
+DPI = 300
+
 # https://github.com/garrettj403/SciencePlots/blob/master/examples/plot-examples.py
 CONTEXT_SCIENCE = plt.style.context(['science'])
 CONTEXT_SCIENCE_GRID = plt.style.context(['science', 'grid'])
@@ -46,6 +48,7 @@ trial_datas_std = {
     'enjoy': enjoy_std_data,
     'enjoy2': enjoy2_std_data,
 }
+# KÉSZ
 
 # __________ RANDOM TRIALS __________
 waffle_rand100_path = WORK_DIR + '/waffle_random_2024-12-28_12-42-49'
@@ -55,14 +58,79 @@ waffle_rand100_data = eval_trial_data(waffle_rand100_path)
 waffle_rand500_data = eval_trial_data(waffle_rand500_path)
 
 trial_datas_rand = {
-    'waffle_default': waffle_std_data,
-    'waffle_random_100': waffle_rand100_data,
     'waffle_random_500': waffle_rand500_data,
+    'waffle_random_100': waffle_rand100_data,
+    'waffle_default': waffle_std_data,
 }
 
-# __________ PLOT TIME FRECHET __________
+# TODO: process after 500 ran
+enjoy_rand100_path = WORK_DIR + ''  # FUT
+enjoy_rand500_path = WORK_DIR + ''  # FUT
+# ...
+
+# __________ GRID TRIALS __________
+waffle_grid_path = WORK_DIR + '/waffle_grid_2024-12-28_12-42-57'
+waffle_grid_data = eval_trial_data(waffle_grid_path)
+# KÉSZ
+
+# __________ BAYESIAN __________
+waffle_bayesian100_path = WORK_DIR + '/waffle_bayesian_2024-12-28_15-47-40'
+waffle_bayesian500_path = WORK_DIR + ''
+enjoy_bayesian100_path = WORK_DIR + ''
+enjoy_bayesian500_path = WORK_DIR + ''
+
+
+# __________ PLOT DEFAULT DISTRIBUTION  __________
 with CONTEXT_SCIENCE:
     fig_std_time = plot_time_frechet(trial_datas_std, colors)
     fig_std_time.savefig(
-        os.path.join(SAVE_PATH, 'std_time_frechet_cost.pdf'),
-        dpi=300)
+        os.path.join(SAVE_PATH, '00_std_time_frechet_cost.pdf'),
+        dpi=DPI)
+
+    fig_std_dist = plot_distance_angle(trial_datas_std, colors)
+    fig_std_dist.savefig(
+        os.path.join(SAVE_PATH, '01_std_distance_angle_cost.pdf'),
+        dpi=DPI)
+
+    fig_std_rms = plot_rms(trial_datas_std, colors)
+    fig_std_rms.savefig(
+        os.path.join(SAVE_PATH, '02_std_rms_cost.pdf'),
+        dpi=DPI)
+
+# __________ PLOT RANDOM DISTRIBUTION WAFFLE  __________
+with CONTEXT_SCIENCE:
+    # the same as above
+    fig_rand_time = plot_time_frechet(trial_datas_rand, colors)
+    fig_rand_time.savefig(
+        os.path.join(SAVE_PATH, '10_rand_time_frechet_cost.pdf'),
+        dpi=DPI)
+
+    fig_rand_dist = plot_distance_angle(trial_datas_rand, colors)
+    fig_rand_dist.savefig(
+        os.path.join(SAVE_PATH, '11_rand_distance_angle_cost.pdf'),
+        dpi=DPI)
+
+    fig_rand_rms = plot_rms(trial_datas_rand, colors)
+    fig_rand_rms.savefig(
+        os.path.join(SAVE_PATH, '12_rand_rms_cost.pdf'),
+        dpi=DPI)
+
+    # scatter plots
+    fig_rand_scatter_time = scatter_time_frechet(trial_datas_rand, colors)
+    fig_rand_scatter_time.savefig(
+        os.path.join(SAVE_PATH, '13_rand_scatter_time_frechet_cost.pdf'),
+        dpi=DPI)
+
+    fig_rand_scatter_dist = scatter_distance_angle(trial_datas_rand, colors)
+    fig_rand_scatter_dist.savefig(
+        os.path.join(SAVE_PATH, '14_rand_scatter_distance_angle_cost.pdf'),
+        dpi=DPI)
+
+    fig_rand_scatter_rms = scatter_rms(trial_datas_rand, colors)
+    fig_rand_scatter_rms.savefig(
+        os.path.join(SAVE_PATH, '15_rand_scatter_rms_cost.pdf'),
+        dpi=DPI)
+
+    # TODO: get recheck with BEST PARAMS
+
+# __________ PLOT GRID DISTRIBUTION  __________

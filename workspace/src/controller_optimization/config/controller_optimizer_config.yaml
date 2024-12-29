@@ -13,6 +13,8 @@ trials:
   - enjoy_grid
   - enjoy_bayesian
   - bayes_test
+  - waffle_bayesian_big
+  - enjoy_bayesian_big
 test_trial:
   map: complex_ref
   robot: waffle
@@ -83,6 +85,13 @@ waffle_bayesian:
   score_method: default
   runs: 100
   run_timeout: 60
+waffle_bayesian_big:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian
+  score_method: default
+  runs: 500
+  run_timeout: 60
 enjoy_random_small:
   map: complex_ref
   robot: enjoy
@@ -105,6 +114,13 @@ enjoy_grid:
   runs: 808
   run_timeout: 60
 enjoy_bayesian:
+  map: complex_ref
+  robot: enjoy
+  generator: bayesian
+  score_method: default
+  runs: 100
+  run_timeout: 60
+enjoy_bayesian_big:
   map: complex_ref
   robot: enjoy
   generator: bayesian
