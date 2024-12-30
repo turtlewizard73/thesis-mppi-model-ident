@@ -5,6 +5,3 @@
 [submodule "workspace/src/controller_benchmark/include/discrete-frechet"]
 	path = workspace/src/controller_benchmark/include/discrete-frechet
 	url = https://github.com/joaofig/discrete-frechet.git
-[submodule "msc-docs"]
-	path = msc-docs
-	url = git@github.com:turtlewizard73/msc-docs.git
