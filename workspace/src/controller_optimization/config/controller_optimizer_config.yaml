@@ -18,6 +18,11 @@ trials:
   - waffle_bayes_f
   - waffle_bayes_time
   - waffle_bayes_jerk
+  - test_bayes_best
+  - waffle_bayes_best
+  - waffle_bayes_best_mid
+  - test_best
+  - bayes_feed
 test_trial:
   map: complex_ref
   robot: waffle
@@ -149,5 +154,40 @@ waffle_bayes_jerk:
   robot: waffle
   generator: bayesian
   score_method: jerk
+  runs: 100
+  run_timeout: 60
+test_best:
+  map: complex_ref
+  robot: waffle
+  generator: best
+  score_method: avarage
+  runs: 30
+  run_timeout: 60
+test_bayes_best:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian_best
+  score_method: avarage
+  runs: 20
+  run_timeout: 60
+waffle_bayes_best:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian_best
+  score_method: avarage
+  runs: 110
+  run_timeout: 60
+waffle_bayes_best_mid:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian_best
+  score_method: avarage
+  runs: 350
+  run_timeout: 60
+bayes_feed:
+  map: complex_ref
+  robot: waffle
+  generator: bayesian_feed
+  score_method: avarage
   runs: 100
   run_timeout: 60

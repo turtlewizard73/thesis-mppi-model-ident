@@ -54,6 +54,12 @@ class ControllerParameters:
                 return
         raise ValueError(f'Critic {critic_name} not found in ControllerParameters.')
 
+    def get_critic_weight(self, critic_name: str) -> float:
+        for critic in self.critics:
+            if critic.name == critic_name:
+                return critic.cost_weight
+        raise ValueError(f'Critic {critic_name} not found in ControllerParameters.')
+
     def _find_mppi_controller(self, data: dict) -> Any:
         """Recursively searches for the Controller configuration."""
         if isinstance(data, dict):

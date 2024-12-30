@@ -5,12 +5,14 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import cycle
+import seaborn as sns
 
 import scienceplots
 from tabulate import tabulate
 
 from utils.trial_data import TrialData
 from utils.util_functions import calculate_avg_std
+from utils.controller_metrics import ControllerMetric
 
 FIGSIZE = (6, 4)
 ms3 = r'$m/s^3$'
@@ -96,6 +98,46 @@ def eval_trial_data(trial_folder: str) -> TrialData:
         calculate_avg_std(td.rms_angular_jerk)
 
     return td
+
+
+def get_best_from_random_search(cs_path: str) -> TrialData:
+    df = pd.read_csv(cs_path)
+
+    # Get the best trial
+    # calculate the best trial
+    trials_scores: dict[str, float] = {}
+    for trial in df.itertuples():
+        if trial.success is False:
+            print(f"Trial {trial.Index} failed")
+            continue
+
+        metric_path = os.path.join(cs_path, trial.metric_path)
+        metric_name = os.path.basename(metric_path)
+
+        # get path without the file name
+        dir_path = os.path.dirname(cs_path)
+        metric_path = os.path.join(dir_path, 'metrics', metric_name)
+
+        if not os.path.exists(metric_path):
+            print(f"Metric not found: {metric_path}")
+            continue
+
+        with open(metric_path, 'rb') as file:
+            m: ControllerMetric = pickle.load(file)
+
+            time = m.time_elapsed
+            frechet = m.frechet_distance
+            cost = m.avg_cost
+            distance = m.distance_to_goal
+            angle = abs(m.angle_to_goal)
+
+            score = time + frechet + cost + distance + angle
+
+            trials_scores.update({
+                trial.id: score})
+
+    sorted_trials_scores = dict(sorted(trials_scores.items(), key=lambda item: item[1]))
+    return sorted_trials_scores
 
 
 def plot_time_frechet(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
@@ -305,14 +347,24 @@ def plot_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Fi
     return fig
 
 
-def scatter_time_frechet(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
+def scatter_time_frechet(
+        trial_datas: dict[str, TrialData], colors=default_colors,
+        best_coordinates: tuple[float, float] = None) -> plt.Figure:
     labels = list(trial_datas.keys())
 
     fig, ax = plt.subplots(num='Scatter Run Time vs Frechet', figsize=FIGSIZE)
     for i, trial in enumerate(trial_datas.values()):
         x = trial.run_time
         y = trial.frechet_distance
-        ax.scatter(x, y, label=labels[i], color=colors[i + 1], alpha=0.5, edgecolors='none')
+        ax.scatter(
+            x, y, label=labels[i],
+            color=colors[i + 1], alpha=0.5, edgecolors='none')
+
+    if best_coordinates is not None:
+        x, y = best_coordinates
+        ax.scatter(
+            x, y, label='best', color='red',
+            marker='x', alpha=1.0, s=100, edgecolors='none')
 
     ax.set_xlabel('Run Time [s]')
     ax.set_ylabel('Frechet Distance [m]')
@@ -322,7 +374,9 @@ def scatter_time_frechet(trial_datas: dict[str, TrialData], colors=default_color
     return fig
 
 
-def scatter_distance_angle(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
+def scatter_distance_angle(
+        trial_datas: dict[str, TrialData], colors=default_colors,
+        best_coordinates: tuple[float, float] = None) -> plt.Figure:
     labels = list(trial_datas.keys())
 
     fig, ax = plt.subplots(num='Scatter Distance to Goal vs Angle to Goal', figsize=FIGSIZE)
@@ -330,6 +384,12 @@ def scatter_distance_angle(trial_datas: dict[str, TrialData], colors=default_col
         x = trial.distance_to_goal
         y = trial.angle_to_goal
         ax.scatter(x, y, label=labels[i], color=colors[i + 1], alpha=0.5, edgecolors='none')
+
+    if best_coordinates is not None:
+        x, y = best_coordinates
+        ax.scatter(
+            x, y, label='best', color='red',
+            marker='x', alpha=1.0, s=100, edgecolors='none')
 
     ax.set_xlabel('Distance to Goal [m]')
     ax.set_ylabel('Angle to Goal [rad]')
@@ -339,7 +399,9 @@ def scatter_distance_angle(trial_datas: dict[str, TrialData], colors=default_col
     return fig
 
 
-def scatter_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
+def scatter_rms(
+        trial_datas: dict[str, TrialData], colors=default_colors,
+        best_coordinates: tuple[float, float] = None) -> plt.Figure:
     labels = list(trial_datas.keys())
 
     fig, ax = plt.subplots(num='Scatter RMS Linear Jerk vs RMS Angular Jerk', figsize=FIGSIZE)
@@ -347,6 +409,12 @@ def scatter_rms(trial_datas: dict[str, TrialData], colors=default_colors) -> plt
         x = trial.rms_linear_jerk
         y = trial.rms_angular_jerk
         ax.scatter(x, y, label=labels[i], color=colors[i + 1], alpha=0.5, edgecolors='none')
+
+    if best_coordinates is not None:
+        x, y = best_coordinates
+        ax.scatter(
+            x, y, label='best', color='red',
+            marker='x', alpha=1.0, s=100, edgecolors='none')
 
     ax.set_xlabel(f'RMS Linear Jerk [{ms3}]')
     ax.set_ylabel(f'RMS Angular Jerk [{rads3}]')
@@ -377,7 +445,7 @@ def eval_grid(trial_folder: str, critic_list: list[str], colors=default_colors) 
     # Prepare the plot
     stuff_to_plot = [
         'time_elapsed',
-        'score',
+        # 'score',
         'distance_to_goal',
         'angle_to_goal',
         'avg_cost',
@@ -418,7 +486,7 @@ def eval_grid(trial_folder: str, critic_list: list[str], colors=default_colors) 
 
             ax.plot(
                 df[f'{critic}.cost_weight'],
-                df[metric],
+                df[metric].abs(),
                 label=critic,
                 color=next(color_cycle)
             )
@@ -435,7 +503,7 @@ def eval_grid(trial_folder: str, critic_list: list[str], colors=default_colors) 
 
 def plot_bayes(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     stuff_to_plot = [
-        'score',
+        # 'score',
         'distance_to_goal',
         'angle_to_goal',
         'avg_cost',
@@ -468,3 +536,62 @@ def plot_bayes(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.
         figures.append(fig)
 
     return figures
+
+
+def plot_bayes_score_time(bayes_data, colors=default_colors):
+    fig, ax = plt.subplots(num='fig_bayes_score_time', figsize=(6, 4))
+
+    # iterations to int
+    id_ints = np.arange(len(bayes_data['id']))
+
+    ax.plot(id_ints, bayes_data['score'], label='score', color=colors[0])
+    ax.plot(id_ints, bayes_data['time_elapsed'], label='time elapsed', color=colors[1])
+    ax.set_xlabel('Iteration')
+    ax.set_ylabel('Score [-] / Time [s]')
+    fig.legend()
+
+    return fig
+
+
+def plot_bayes_frechet(bayes_data, colors=default_colors):
+    fig, ax = plt.subplots(num='fig_bayes_frechet', figsize=(6, 4))
+
+    # iterations to int
+    id_ints = np.arange(len(bayes_data['id']))
+
+    ax.plot(id_ints, bayes_data['score'], label='score', color=colors[0])
+    ax.plot(id_ints, bayes_data['frechet_distance'], label='frechet distance', color=colors[1])
+    ax.set_xlabel('Iteration')
+    ax.set_ylabel('Score [-] / Frechet distance [m]')
+    fig.legend()
+
+    return fig
+
+
+def plot_histogram(file_path):
+    data = pd.read_csv(file_path)
+
+    # Extract cost_weight columns
+    cost_weight_columns = [col for col in data.columns if "cost_weight" in col]
+    # Extract the metrics
+    metrics = ['time_elapsed', 'score', 'distance_to_goal', 'angle_to_goal',
+               'avg_cost', 'rms_linear_jerk', 'rms_angular_jerk']
+
+    critics_df = data[cost_weight_columns + metrics]
+
+    # Rename columns to remove '.cost_weight'
+    renamed_columns = {col: col.replace(".cost_weight", "") for col in cost_weight_columns}
+    critics_df.rename(columns=renamed_columns, inplace=True)
+
+    # Calculate correlations
+    correlation_matrix = critics_df.corr()
+
+    # Create the heatmap
+    fig = plt.figure(figsize=(10, 10))
+    sns.heatmap(correlation_matrix, annot=True, cmap="coolwarm", fmt=".2f",
+                xticklabels=correlation_matrix.columns, yticklabels=correlation_matrix.columns)
+
+    # Add titles and labels
+    # plt.title("Correlation Heatmap of Critics' Cost Weights")
+    fig.tight_layout()
+    return fig
