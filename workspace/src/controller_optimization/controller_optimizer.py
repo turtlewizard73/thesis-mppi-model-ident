@@ -34,6 +34,7 @@ class GeneratorType(Enum):
     BAYESIAN = 'bayesian'
     BAYESIAN_BEST = 'bayesian_best'
     BAYESIAN_FEED = 'bayesian_feed'
+    BEST_BEST = 'best_best'
 
 
 class Trial(TypedDict):
@@ -166,6 +167,8 @@ class ControllerOptimizer:
                     self.generator = self.generator_bayesian_best
                 case GeneratorType.BAYESIAN_FEED:
                     self.generator = self.generator_bayesian_feed
+                case GeneratorType.BEST_BEST:
+                    self.generator = self.generator_best_best
                 case _:
                     raise ValueError(f"Invalid generator type: {trial['generator']}")
         else:
@@ -212,6 +215,33 @@ class ControllerOptimizer:
         best_metric, best_params = self.get_best_metric()
         score = self.score_method(best_metric)
 
+        self.test_params = deepcopy(best_params)
+        self.cb.update_parameters(self.test_params)
+
+        for i in range(1, n + 1):
+            # do not change parameters
+            yield i
+
+    def generator_best_best(self):
+        n = self.current_trial['runs']
+
+        DIR = constants.OPTIMIZATION_OUTPUT_PATH + '/bayes_feed_2024-12-30_01-12-05'
+        FINAL_CSV_PATH = os.path.join(DIR, 'final_results.csv')
+        df = pd.read_csv(FINAL_CSV_PATH)
+
+        max_score = df['score'].max()
+        best_row = df[df['score'] == max_score]
+
+        best_metric_path = os.path.join(DIR, 'metrics/metric_41.pickle')
+        best_metric = self.cb.load_metric(best_metric_path)
+        score = self.score_method(best_metric)
+
+        best_params = ControllerParameters()
+        for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+            best_params.set_critic_weight(
+                critic, best_row.iloc[0][f'{critic}.cost_weight'])
+
+        # get row of max score
         self.test_params = deepcopy(best_params)
         self.cb.update_parameters(self.test_params)
 
@@ -474,7 +504,8 @@ class ControllerOptimizer:
 
         # 120 seconds timeout should be enough for the reference run
         if (self.current_trial['generator'] == 'bayesian_best' or
-                self.current_trial['generator'] == 'best'):
+                self.current_trial['generator'] == 'best' or
+                self.current_trial['generator'] == 'best_best'):
             metric, self.reference_params = self.get_best_metric()
         else:
             metric: ControllerMetric = self.cb.run_benchmark(

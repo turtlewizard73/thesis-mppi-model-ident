@@ -503,7 +503,7 @@ def eval_grid(trial_folder: str, critic_list: list[str], colors=default_colors) 
 
 def plot_bayes(trial_datas: dict[str, TrialData], colors=default_colors) -> plt.Figure:
     stuff_to_plot = [
-        # 'score',
+        'score',
         'distance_to_goal',
         'angle_to_goal',
         'avg_cost',

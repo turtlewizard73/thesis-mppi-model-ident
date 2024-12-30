@@ -23,6 +23,7 @@ trials:
   - waffle_bayes_best_mid
   - test_best
   - bayes_feed
+  - best_best
 test_trial:
   map: complex_ref
   robot: waffle
@@ -190,4 +191,11 @@ bayes_feed:
   generator: bayesian_feed
   score_method: avarage
   runs: 100
+  run_timeout: 60
+best_best:
+  map: complex_ref
+  robot: waffle
+  generator: best_best
+  score_method: avarage
+  runs: 20
   run_timeout: 60
