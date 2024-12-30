@@ -9,6 +9,13 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import traceback
+import pickle
+
+# bayesian stuff
+from skopt import Optimizer
+from skopt import gp_minimize
+from skopt.space import Real
+from skopt.utils import use_named_args
 
 import constants
 from utils.util_functions import timing_decorator
@@ -23,7 +30,11 @@ class GeneratorType(Enum):
     DEFAULT = 'default'
     RANDOM = 'random'
     GRID = 'grid'
+    BEST = 'best'
     BAYESIAN = 'bayesian'
+    BAYESIAN_BEST = 'bayesian_best'
+    BAYESIAN_FEED = 'bayesian_feed'
+    BEST_BEST = 'best_best'
 
 
 class Trial(TypedDict):
@@ -136,6 +147,9 @@ class ControllerOptimizer:
         if timeout > 0.0:
             self.current_trial['run_timeout'] = timeout
 
+        # overwrite benchmark configs
+        self.cb.params['robot_name'] = trial['robot']
+
         # set the generator function
         if generator is None:
             match GeneratorType(trial['generator']):
@@ -145,6 +159,16 @@ class ControllerOptimizer:
                     self.generator = self.generator_random
                 case GeneratorType.GRID:
                     self.generator = self.generator_grid
+                case GeneratorType.BEST:
+                    self.generator = self.generator_default_best
+                case GeneratorType.BAYESIAN:
+                    self.generator = self.generator_bayesian
+                case GeneratorType.BAYESIAN_BEST:
+                    self.generator = self.generator_bayesian_best
+                case GeneratorType.BAYESIAN_FEED:
+                    self.generator = self.generator_bayesian_feed
+                case GeneratorType.BEST_BEST:
+                    self.generator = self.generator_best_best
                 case _:
                     raise ValueError(f"Invalid generator type: {trial['generator']}")
         else:
@@ -152,10 +176,20 @@ class ControllerOptimizer:
             self.generator = generator
 
         # set score function
+        self.current_score = 0.0
         if score_method is None:
+            self.logger.info(f'Using score method: {trial["score_method"]}')
             match trial['score_method']:
                 case 'default':
                     self.score_method = self.score_default
+                case 'frechet':
+                    self.score_method = self.score_frechet
+                case 'time':
+                    self.score_method = self.score_time
+                case 'jerk':
+                    self.score_method = self.score_jerk
+                case 'avarage':
+                    self.score_method = self.score_avarage
                 case _:
                     raise ValueError(f"Invalid score method: {trial['score_method']}")
         else:
@@ -176,6 +210,45 @@ class ControllerOptimizer:
             # do not change parameters
             yield i
 
+    def generator_default_best(self):
+        n = self.current_trial['runs']
+        best_metric, best_params = self.get_best_metric()
+        score = self.score_method(best_metric)
+
+        self.test_params = deepcopy(best_params)
+        self.cb.update_parameters(self.test_params)
+
+        for i in range(1, n + 1):
+            # do not change parameters
+            yield i
+
+    def generator_best_best(self):
+        n = self.current_trial['runs']
+
+        DIR = constants.OPTIMIZATION_OUTPUT_PATH + '/bayes_feed_2024-12-30_01-12-05'
+        FINAL_CSV_PATH = os.path.join(DIR, 'final_results.csv')
+        df = pd.read_csv(FINAL_CSV_PATH)
+
+        max_score = df['score'].max()
+        best_row = df[df['score'] == max_score]
+
+        best_metric_path = os.path.join(DIR, 'metrics/metric_41.pickle')
+        best_metric = self.cb.load_metric(best_metric_path)
+        score = self.score_method(best_metric)
+
+        best_params = ControllerParameters()
+        for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+            best_params.set_critic_weight(
+                critic, best_row.iloc[0][f'{critic}.cost_weight'])
+
+        # get row of max score
+        self.test_params = deepcopy(best_params)
+        self.cb.update_parameters(self.test_params)
+
+        for i in range(1, n + 1):
+            # do not change parameters
+            yield i
+
     def generator_random(self):
         n = self.current_trial['runs']
 
@@ -190,12 +263,131 @@ class ControllerOptimizer:
         scale = 1
         # generate grid and update the controller benchmark
         i = 1
+        grid_space = np.arange(0, n, scale)
+
         for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
-            grid_space = np.arange(0, n, scale)
+            # load back the default parameters
+            self.test_params = deepcopy(self.reference_params)
             for v in grid_space:
                 self.test_params.set_critic_weight(critic, v)
+                self.cb.update_parameters(self.test_params)
                 yield i
                 i += 1
+
+    def generator_bayesian(self):
+        space = [Real(0.0, 100.0, name=critic)
+                 for critic in constants.DEFAULT_MPPI_CRITIC_NAMES]
+        optimizer = Optimizer(dimensions=space, random_state=0)
+
+        n = self.current_trial['runs']
+        for i in range(1, n + 1):
+            # suggest new parameters using the Optimizer
+            suggested = optimizer.ask()
+            suggested_params = {dim.name: val for dim, val in zip(space, suggested)}
+
+            # update params
+            for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+                self.test_params.set_critic_weight(critic, suggested_params[critic])
+            self.cb.update_parameters(self.test_params)
+
+            # simulate a score using the suggested parameters
+            yield i
+
+            # tell the optimizer the result of the evaluation
+            optimizer.tell(suggested, self.current_score)
+
+    def get_best_metric(self):
+        BEST_ROW = 211
+        BEST_ROW += 2
+        BEST_ID = 264
+        DIR = os.path.join(
+            constants.OPTIMIZATION_OUTPUT_PATH,
+            'waffle_random_big_2024-12-28_15-49-04')
+        FINAL_CSV_PATH = os.path.join(DIR, 'final_results.csv')
+
+        header = pd.read_csv(FINAL_CSV_PATH, nrows=0)
+        best_row = pd.read_csv(
+            FINAL_CSV_PATH, skiprows=BEST_ROW - 1, nrows=1, header=None)
+        best_row.columns = header.columns
+
+        # load metric and get pose
+        best_metric_path = os.path.join(DIR, f'metrics/metric_{BEST_ID}.pickle')
+        best_metric = self.cb.load_metric(best_metric_path)
+
+        best_params = ControllerParameters()
+        for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+            best_params.set_critic_weight(
+                critic, best_row.iloc[0][f'{critic}.cost_weight'])
+
+        return best_metric, best_params
+
+    def generator_bayesian_best(self):
+        space = [Real(0.0, 100.0, name=critic)
+                 for critic in constants.DEFAULT_MPPI_CRITIC_NAMES]
+        optimizer = Optimizer(dimensions=space, random_state=0)
+
+        best_metric, best_params = self.get_best_metric()
+        score = self.score_method(best_metric)
+
+        # get position
+        position = []
+        for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+            # position.append(best_row.iloc[0][f'{critic}.cost_weight'])
+            position.append(best_params.get_critic_weight(critic))
+
+        # add initial position
+        optimizer.tell(position, score)
+
+        n = self.current_trial['runs']
+        for i in range(1, n + 1):
+            # suggest new parameters using the Optimizer
+            suggested = optimizer.ask()
+            suggested_params = {dim.name: val for dim, val in zip(space, suggested)}
+
+            # update params
+            for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+                self.test_params.set_critic_weight(critic, suggested_params[critic])
+            self.cb.update_parameters(self.test_params)
+
+            # simulate a score using the suggested parameters
+            yield i
+
+            # tell the optimizer the result of the evaluation
+            optimizer.tell(suggested, self.current_score)
+
+    def generator_bayesian_feed(self):
+        space = [Real(0.0, 100.0, name=critic)
+                 for critic in constants.DEFAULT_MPPI_CRITIC_NAMES]
+        optimizer = Optimizer(dimensions=space, random_state=0)
+        DIR = os.path.join(
+            constants.OPTIMIZATION_OUTPUT_PATH,
+            'waffle_random_big_2024-12-28_15-49-04')
+        POSITIONS_SCORES_PATH = os.path.join(DIR, 'positions_scores.csv')
+        df = pd.read_csv(POSITIONS_SCORES_PATH)
+
+        for i, row in df.iterrows():
+            position = eval(row['position'])  # Convert string representation of list back to list
+            score = row['score']
+
+            self.logger.info(f"Feeding optimizer: {i} - score: {score}")
+            optimizer.tell(position, score)
+
+        n = self.current_trial['runs']
+        for i in range(1, n + 1):
+            # suggest new parameters using the Optimizer
+            suggested = optimizer.ask()
+            suggested_params = {dim.name: val for dim, val in zip(space, suggested)}
+
+            # update params
+            for critic in constants.DEFAULT_MPPI_CRITIC_NAMES:
+                self.test_params.set_critic_weight(critic, suggested_params[critic])
+            self.cb.update_parameters(self.test_params)
+
+            # simulate a score using the suggested parameters
+            yield i
+
+            # tell the optimizer the result of the evaluation
+            optimizer.tell(suggested, self.current_score)
 
     def score_default(self, metric: ControllerMetric) -> float:
         # smaller is better
@@ -226,26 +418,72 @@ class ControllerOptimizer:
 
         return float(score)
 
-    def _run(self, run_uid: str):
-        result = self.cb.run_benchmark(run_uid=run_uid)
+    def score_avarage(self, metric: ControllerMetric) -> float:
+        # SMALLER IS BETTER
+        # avarage values got from distribution
+        avg_time = 35.0
+        avg_frechet = 0.22
+        avg_cost = 11.0
+        avg_distance = 0.22
+        avg_angle = 0.11
 
-        if not result.success:
+        # max lets be 2 times the average
+        max_time = 65.0
+        max_frechet = 0.62
+        max_cost = 13
+        max_distance = 0.3
+        max_angle = 0.25
+
+        norm_time = metric.time_elapsed / max_time
+        norm_frechet = metric.frechet_distance / max_frechet
+        norm_cost = metric.avg_cost / max_cost
+        norm_distance = metric.distance_to_goal / max_distance
+        norm_angle = metric.angle_to_goal / max_angle
+
+        score = (norm_time**2 + norm_frechet**2 + norm_cost **
+                 2 + norm_distance**2 + norm_angle**2)**0.5
+        return float(score)
+
+    def score_frechet(self, metric: ControllerMetric) -> float:
+        max_distance = np.linalg.norm(metric.path_xy[-1] - metric.path_xy[0]) / 2
+        normalized_frechet_distance = metric.frechet_distance / max_distance
+
+        return float(normalized_frechet_distance)
+
+    def score_time(self, metric: ControllerMetric) -> float:
+        max_time = 60.0
+        normalized_time_elapsed = metric.time_elapsed / max_time
+
+        return float(normalized_time_elapsed)
+
+    def score_jerk(self, metric: ControllerMetric) -> float:
+        max_linear_jerk = 1.0
+        max_angular_jerk = 5.0
+        normalized_rms_linear_jerk = metric.rms_linear_jerk / max_linear_jerk
+        normalized_rms_angular_jerk = metric.rms_angular_jerk / max_angular_jerk
+
+        return float(normalized_rms_linear_jerk + normalized_rms_angular_jerk)
+
+    def _run(self, run_uid: str):
+        metric = self.cb.run_benchmark(run_uid=run_uid)
+
+        if not metric.success:
             return RunResult(
                 id=run_uid,
                 success=False,
-                time_elapsed=result.time_elapsed,
-                status_msg=result.status_msg,
+                time_elapsed=metric.time_elapsed,
+                status_msg=metric.status_msg,
             )
 
-        metric = self.cb.calculate_metric(result)
         metric_path = self.cb.save_metric(metric)
         score = self.score_method(metric)
 
         return RunResult(
             id=run_uid,
             success=True,
-            time_elapsed=result.time_elapsed,
+            time_elapsed=metric.time_elapsed,
             score=score,
+            frechet_distance=metric.frechet_distance,
             distance_to_goal=metric.distance_to_goal,
             angle_to_goal=metric.angle_to_goal,
             avg_cost=metric.avg_cost,
@@ -260,24 +498,34 @@ class ControllerOptimizer:
     def run_reference(self) -> bool:
         self.logger.info("Running reference benchmark")
 
+        # setup
         self.cb.update_parameters(self.reference_params)
         self.cb.update_map(self.current_trial['map'])
 
         # 120 seconds timeout should be enough for the reference run
-        result = self.cb.run_benchmark(run_uid='reference', timeout=120)
-        if result.success is False:
-            self.logger.error(f"Failed to run reference benchmark: {result.status_msg}")
-            return False
+        if (self.current_trial['generator'] == 'bayesian_best' or
+                self.current_trial['generator'] == 'best' or
+                self.current_trial['generator'] == 'best_best'):
+            metric, self.reference_params = self.get_best_metric()
+        else:
+            metric: ControllerMetric = self.cb.run_benchmark(
+                run_uid='reference', timeout=120)
+            if metric.success is False:
+                self.logger.error(
+                    f"Failed to run reference benchmark: {metric.status_msg}")
+                return False
 
-        self.reference_metric = self.cb.calculate_metric(result)
+        self.reference_metric = metric
         self.reference_metric_path = self.cb.save_metric(self.reference_metric)
         self.reference_score = self.score_method(self.reference_metric)
+        self.current_score = self.reference_score
 
         ref_run_result = RunResult(
             id='reference',
             success=True,
-            time_elapsed=result.time_elapsed,
+            time_elapsed=metric.time_elapsed,
             score=self.reference_score,
+            frechet_distance=self.reference_metric.frechet_distance,
             distance_to_goal=self.reference_metric.distance_to_goal,
             angle_to_goal=self.reference_metric.angle_to_goal,
             avg_cost=self.reference_metric.avg_cost,
@@ -312,7 +560,7 @@ class ControllerOptimizer:
         self.logger.info(f'Updating map: {self.current_trial["map"]}')
         self.cb.update_map(self.current_trial['map'])
 
-        self.logger.info(f"Running optimizer for trial: {trial_name}")
+        self.logger.debug(f"Running optimizer for trial: {trial_name}")
 
         best_score = 1e9
         best_params: ControllerParameters = deepcopy(self.test_params)
@@ -328,11 +576,13 @@ class ControllerOptimizer:
                 run_result: RunResult = self._run(i)
                 if run_result['success'] is False:
                     self.logger.warn(f"Failed to run trial {i}/{num_trials}")
+                    # TODO: log this also
                     continue
 
                 successful_trials += 1
 
                 score = run_result['score']
+                self.current_score = score
                 self.logger.info(f"Trial {i}/{num_trials} finished with score: {score}")
                 if run_result['score'] < best_score:
                     best_score = score

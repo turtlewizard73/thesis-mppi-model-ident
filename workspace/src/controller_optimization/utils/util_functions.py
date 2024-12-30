@@ -44,6 +44,10 @@ def setup_run(
         '-t', '--trial', type=str, default='default',
         help='Name of the trial to run if using optimizer mode.')
 
+    parser.add_argument(
+        '-e', '--evaluation', type=str, default='',
+    )
+
     args = parser.parse_args()
 
     # Set logger name
@@ -90,7 +94,10 @@ def setup_run(
     if args.benchmark is True and args.optimizer is True:
         raise ValueError("Cannot run in both benchmark and optimizer mode.")
 
-    if args.benchmark is False and args.optimizer is False:
+    if (args.benchmark is False and
+            args.optimizer is False and
+            args.plot_last is False and
+            args.evaluation == ''):
         logger.warning("No mode selected, running in benchmark mode.")
         args.benchmark = True
 
@@ -216,3 +223,10 @@ def newton_diff_nonuniform(y: np.ndarray, t: np.ndarray) -> np.ndarray:
     derivative[-1] = (y[-1] - y[-2]) / dt_forward[-1]  # Backward difference for the last point
 
     return derivative
+
+
+def calculate_avg_std(float_list):
+    n = len(float_list)
+    mean = sum(float_list) / n
+    std = (sum([(x - mean) ** 2 for x in float_list]) / n) ** 0.5
+    return mean, std

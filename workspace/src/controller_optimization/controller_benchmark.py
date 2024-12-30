@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 import pickle
 from tabulate import tabulate
+import similaritymeasures
 
 # ros imports
 import rclpy
@@ -31,7 +32,6 @@ from nav2_msgs.srv import LoadMap
 import rclpy.time
 from utils.util_functions import yaw2quat, timing_decorator, newton_diff
 import utils.util_nodes as util_nodes
-from utils.discrete_frechet import FastDiscreteFrechetMatrix, euclidean
 
 import constants
 from utils.controller_metrics import ControllerMetric
@@ -86,8 +86,6 @@ class ControllerBenchmark:
 
         self.nav = nav2.BasicNavigator()
         self.override_navigator()
-
-        self.frechet_calc = FastDiscreteFrechetMatrix(euclidean)
 
     def __del__(self) -> None:
         self.logger.info('Destructor called.')
@@ -271,7 +269,7 @@ class ControllerBenchmark:
                 f'{controller_name}.{critic.name}.cost_power': critic.cost_power
             })
 
-        params_set = self.param_manager.set_parameters(parameters.to_dict())
+        params_set = self.param_manager.set_parameters(critics_dict)
         if params_set is False:
             self.logger.error('Failed to set parameters')
             return False
@@ -279,7 +277,7 @@ class ControllerBenchmark:
         self.current_controller_params = parameters
         return True
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Launching nodes...'),
         lambda self, ex_time: self.logger.info(f'Launched nodes in {ex_time:.4f} seconds.'))
     def launch_nodes(self):
@@ -325,7 +323,7 @@ class ControllerBenchmark:
             if 'sub' in name:
                 node.collect_data = False
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Stopping nodes, sub executors, threads...'),
         lambda self, ex_time: self.logger.info(f'Stopped nodes in {ex_time:.4f} seconds.'))
     def stop_nodes(self):
@@ -355,7 +353,7 @@ class ControllerBenchmark:
         except Exception as e:
             raise RuntimeError(f'Failed to stop nodes: {e}') from e
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.debug('Checking if nodes are active...'),
         lambda self, ex_time: self.logger.debug(f'Checked nodes in {ex_time:.4f} seconds.')
     )
@@ -402,7 +400,7 @@ class ControllerBenchmark:
 
         return True, 'All nodes are active'
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Running benchmark...'),
         lambda self, ex_time: self.logger.info(f'Benchmark finished in {ex_time:.4f} seconds.'))
     def run_benchmark(
@@ -565,6 +563,7 @@ class ControllerBenchmark:
         costmap_msg: Costmap = self.nav.getLocalCostmap()
         size_x = costmap_msg.metadata.size_x
         size_y = costmap_msg.metadata.size_y
+        # FIXME: only with rolling=false
         costmap_array = np.array(
             costmap_msg.data, dtype=np.uint8).reshape((size_y, size_x))
         costmap_array = np.flip(costmap_array, 0)
@@ -582,13 +581,13 @@ class ControllerBenchmark:
         metric.costmap_origin_x = costmap_msg.metadata.origin.position.x
         metric.costmap_origin_y = costmap_msg.metadata.origin.position.y
 
-        return metric
-
     @timing_decorator(
         lambda self: self.logger.info('Calculating metric...'),
         lambda self, ex_time: self.logger.info(f'Calculated metric in {ex_time:.4f} seconds.'))
-    def calculate_metric(self, metric: ControllerMetric) -> ControllerMetric:
-        metric.frechet_distance = self.frechet_calc.distance(metric.path_xy, metric.odom_xy)
+    def calculate_metric(self, metric: ControllerMetric):
+        # metric.frechet_distance = self.frechet_calc.distance(metric.path_xy, metric.odom_xy)
+        metric.frechet_distance = similaritymeasures.frechet_dist(metric.path_xy, metric.odom_xy)
+
         metric.distance_to_goal = np.linalg.norm(metric.path_xy[-1] - metric.odom_xy[-1])
         metric.angle_to_goal = metric.path_omega[-1] - \
             metric.odom_omega[-1]  # FIXME: it could be quaternion
@@ -631,6 +630,8 @@ class ControllerBenchmark:
             y_idx = size_y - y_idx
 
             # get the cost along the path
+            # TODO: add some resolution scaling to this
+            # problem: config local_costmap resolution not same as maps
             path_costs.append(metric.costmap[size_y - y_idx, x_idx])
 
             # get the cost in robot radius
@@ -646,8 +647,6 @@ class ControllerBenchmark:
         metric.path_costs = path_costs
         metric.sum_of_costs = np.sum(costmap_masked)
         metric.avg_cost = np.mean(costmap_masked)
-
-        return metric
 
     def save_metric(
             self, metric: ControllerMetric,
@@ -826,7 +825,7 @@ class ControllerBenchmark:
         return tabulate(
             table_data, headers=["Attribute", "Value", "Unit"], tablefmt="grid", floatfmt='.4f')
 
-    @ timing_decorator(
+    @timing_decorator(
         lambda self: self.logger.info('Plotting metric...'),
         lambda self, ex_time: self.logger.info(f'Plotted metric in {ex_time:.4f} seconds.')
     )

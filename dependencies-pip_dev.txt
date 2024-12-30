@@ -6,3 +6,4 @@ psutil
 memory_profiler
 scikit-optimize
 numpy==1.22.0
+similaritymeasures

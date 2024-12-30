@@ -164,7 +164,8 @@
       "**/.git/objects/**",
       ".vscode",
       ".vscode-insiders",
-      ".devcontainer/devcontainer.json"
+      ".devcontainer/devcontainer.json",
+      "**/msc-docs/*"
     ],
     "ros.distro": "humble",
     "ros.rosSetupScript": "${workspaceFolder}/workspace/install/setup.bash",

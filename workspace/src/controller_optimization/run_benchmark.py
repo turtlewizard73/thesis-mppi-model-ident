@@ -1,8 +1,13 @@
 #! /usr/bin/env python3
 
+import os
+import yaml
+import pandas as pd
+import pickle
 import traceback
 import argparse
 import matplotlib.pyplot as plt
+import faulthandler
 
 import constants
 from utils.util_functions import setup_run
@@ -17,6 +22,7 @@ OPTIMIZER_CONFIG_PATH = constants.OPTIMIZER_CONFIG_PATH
 DEFAULT_MPPI_PARAMS_PATH = constants.DEFAULT_MPPI_PARAMS_PATH
 
 global args, logger
+faulthandler.enable()
 
 
 def run_benchmark():
@@ -32,7 +38,7 @@ def run_benchmark():
         default_mppi_params = ControllerParameters()
         default_mppi_params.load_from_yaml(DEFAULT_MPPI_PARAMS_PATH)
         if args.random is True:
-            default_mppi_params.randomize_parameters()
+            default_mppi_params.randomize_weights()
         benchmark.update_parameters(default_mppi_params)
 
         # init map
@@ -101,22 +107,55 @@ def plot_last():
 def run_optimizer():
     global args, logger
 
-    # init optimizer
-    optimizer = ControllerOptimizer(
-        logger=logger,
-        config_path=OPTIMIZER_CONFIG_PATH)
+    try:
+        # init optimizer
+        optimizer = ControllerOptimizer(
+            logger=logger,
+            config_path=OPTIMIZER_CONFIG_PATH)
 
-    # setup optimizer
-    if args.trial == 'default':
-        logger.warning("No trial selected, using default.")
-        args.trial = 'test_trial'
-    optimizer.setup_run(trial_name=args.trial)
+        # setup optimizer
+        if args.trial == 'default':
+            logger.warning("No trial selected, using default.")
+            args.trial = 'test_trial'
+        optimizer.setup_run(trial_name=args.trial)
 
-    # run optimizer
-    optimizer.run_reference()
-    optimizer.run()
+        # run optimizer
+        optimizer.run_reference()
+        optimizer.run()
+    except Exception as e:
+        logger.error(e)
+        traceback.print_exc()
 
     del optimizer
+
+
+def run_evaluation():
+    global args, logger
+    WORK_DIR = args.evaluation
+    WORK_DIR = os.path.abspath(WORK_DIR)
+    logger.info(f"Running evaluation on {WORK_DIR}.")
+
+
+def run_test():
+    global args, logger
+    logger.info("___ TEST ___")
+    try:
+        benchmark = ControllerBenchmark(logger, BENCHMARK_CONFIG_PATH)
+        benchmark.update_map()
+        # metric: ControllerMetric = benchmark.run_benchmark()
+
+        # init parameters
+        default_mppi_params = ControllerParameters()
+        default_mppi_params.load_from_yaml(DEFAULT_MPPI_PARAMS_PATH)
+        default_mppi_params.randomize_weights()
+
+        benchmark.update_parameters(default_mppi_params)
+
+    except Exception as e:
+        logger.error(e)
+        traceback.print_exc()
+    finally:
+        del benchmark
 
 
 def main():
@@ -129,18 +168,22 @@ def main():
     try:
         if args.benchmark is True:
             run_benchmark()
+            return 0
         elif args.plot_last is True:
             plot_last()
+            return 0
         elif args.optimizer is True:
             run_optimizer()
+            return 0
+        elif args.evaluation != '':
+            run_evaluation()
+            return 0
         else:
-            raise ValueError("Invalid run mode.")
+            run_test()
     except Exception as e:
         logger.error(e)
         traceback.print_exc()
         return 1
-    else:
-        return 0
 
 
 if __name__ == '__main__':
